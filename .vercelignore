@@ -1,0 +1,10 @@
+# Vercel deploy: sobe tudo exceto segredos/lixo. dist/ é enviado de propósito
+# (o lambda do Express serve o dist) e o buildCommand regera caso ausente.
+.env
+.env.*
+node_modules
+.git
+.vercel
+logs
+*.log
+.DS_Store

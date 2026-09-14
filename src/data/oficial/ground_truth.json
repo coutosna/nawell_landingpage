@@ -1,0 +1,482 @@
+[
+  {
+    "chave_nfe": "NFE000000000001",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "cfop_incompativel_operacao",
+        "detalhe": "CFOP 1.657 (Retorno de remessa de combustível ou lubrificante ) é código de entrada, incompatível com nota de saída (venda)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000002",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000003",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": null,
+        "tipo": "cnpj_invalido",
+        "detalhe": "CNPJ 12345678000196 tem dígito verificador inválido"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000004",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "cclasstrib_documento_incompativel",
+        "detalhe": "cClassTrib 200026 não é habilitado para uso em NF-e (indNFe=0)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000005",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000006",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 2,
+        "tipo": "aliquota_reducao_divergente",
+        "detalhe": "Percentual de redução declarado (IBS 30%, CBS 50%) não bate com o oficial do cClassTrib 800002 (IBS 0%, CBS 0%)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000007",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "ncm_invalido",
+        "detalhe": "NCM 87085100 não consta na tabela TIPI vigente"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000008",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000009",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": null,
+        "tipo": "cnae_invalido",
+        "detalhe": "CNAE 2943309 não consta na tabela oficial do IBGE"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000010",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 2,
+        "tipo": "ncm_formato_invalido",
+        "detalhe": "NCM '910229' não tem os 8 dígitos exigidos"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000011",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000012",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "cst_cclasstrib_mismatch",
+        "detalhe": "CST declarado 000 não bate com cClassTrib 200017 (pertence ao CST 200)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000013",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "ncm_invalido",
+        "detalhe": "NCM 09081199 não consta na tabela TIPI vigente"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000014",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "cst_cclasstrib_mismatch",
+        "detalhe": "CST declarado 550 não bate com cClassTrib 200043 (pertence ao CST 200)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000015",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000016",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 2,
+        "tipo": "valor_incoerente",
+        "detalhe": "valor_total (6728.2) não bate com valor_unitario x quantidade (939.54 x 5 = 4697.7)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000017",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000018",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000019",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000020",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000021",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000022",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 2,
+        "tipo": "cclasstrib_fora_vigencia",
+        "detalhe": "cClassTrib 000003 só é válido a partir de 2026-01-01 00:00:00, mas nota foi emitida antes disso"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000023",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000024",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000025",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000026",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000027",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000028",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 2,
+        "tipo": "cclasstrib_fora_vigencia",
+        "detalhe": "cClassTrib 550003 só é válido a partir de 2026-01-01 00:00:00, mas nota foi emitida antes disso"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000029",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "aliquota_reducao_divergente",
+        "detalhe": "Percentual de redução declarado (IBS 50%, CBS 50%) não bate com o oficial do cClassTrib 800002 (IBS 0%, CBS 0%)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000030",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "ncm_formato_invalido",
+        "detalhe": "NCM '410390' não tem os 8 dígitos exigidos"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000031",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": null,
+        "tipo": "cnpj_invalido",
+        "detalhe": "CNPJ 34567890000131 tem dígito verificador inválido"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000032",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000033",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000034",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000035",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": null,
+        "tipo": "cnpj_invalido",
+        "detalhe": "CNPJ 45678901000176 tem dígito verificador inválido"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000036",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000037",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "aliquota_reducao_divergente",
+        "detalhe": "Percentual de redução declarado (IBS 50%, CBS 30%) não bate com o oficial do cClassTrib 620004 (IBS 0%, CBS 0%)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000038",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000039",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000040",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "ncm_invalido",
+        "detalhe": "NCM 11032099 não consta na tabela TIPI vigente"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000041",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "ncm_invalido",
+        "detalhe": "NCM 59069199 não consta na tabela TIPI vigente"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000042",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000043",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000044",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000045",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000046",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 3,
+        "tipo": "cclasstrib_documento_incompativel",
+        "detalhe": "cClassTrib 220002 não é habilitado para uso em NF-e (indNFe=0)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000047",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000048",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000049",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000050",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "cfop_incompativel_operacao",
+        "detalhe": "CFOP 2.660 (Devolução de venda de combustível ou lubrificante ) é código de entrada, incompatível com nota de saída (venda)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000051",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": null,
+        "tipo": "cnae_invalido",
+        "detalhe": "CNAE 1092909 não consta na tabela oficial do IBGE"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000052",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000053",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": null,
+        "tipo": "cnpj_invalido",
+        "detalhe": "CNPJ 12345678000196 tem dígito verificador inválido"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000054",
+    "tem_erro_planejado": false,
+    "erros": []
+  },
+  {
+    "chave_nfe": "NFE000000000055",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": null,
+        "tipo": "cnpj_invalido",
+        "detalhe": "CNPJ 56789012000101 tem dígito verificador inválido"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000056",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "ncm_invalido",
+        "detalhe": "NCM 19021999 não consta na tabela TIPI vigente"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000057",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "cclasstrib_documento_incompativel",
+        "detalhe": "cClassTrib 820006 não é habilitado para uso em NF-e (indNFe=0)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000058",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 2,
+        "tipo": "cclasstrib_documento_incompativel",
+        "detalhe": "cClassTrib 011005 não é habilitado para uso em NF-e (indNFe=0)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000059",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 1,
+        "tipo": "valor_incoerente",
+        "detalhe": "valor_total (4562.95) não bate com valor_unitario x quantidade (173.15 x 18 = 3116.7)"
+      }
+    ]
+  },
+  {
+    "chave_nfe": "NFE000000000060",
+    "tem_erro_planejado": true,
+    "erros": [
+      {
+        "nItem": 2,
+        "tipo": "ncm_formato_invalido",
+        "detalhe": "NCM '050210' não tem os 8 dígitos exigidos"
+      }
+    ]
+  }
+]

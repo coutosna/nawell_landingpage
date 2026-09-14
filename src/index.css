@@ -1,0 +1,418 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  /* Esconde scrollbar mas mantém funcionalidade */
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Hover scale animation */
+  .hover-scale {
+    @apply transition-transform duration-200 ease-out hover:scale-105;
+  }
+}
+
+/* NAWELL — Plataforma de Inteligência Tributária */
+
+@layer base {
+  :root {
+    --background: 220 23% 97%;
+    --foreground: 220 49% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 49% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 49% 8%;
+
+    /* Primária — Electric Blue NAWELL */
+    --primary: 217 91% 59%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 217 91% 64%;
+
+    --secondary: 220 20% 93%;
+    --secondary-foreground: 220 49% 8%;
+
+    --muted: 220 18% 95%;
+    --muted-foreground: 222 12% 45%;
+
+    /* Accent — Indigo/Violet NAWELL */
+    --accent: 239 23% 46%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Status colors semânticos */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 220 49% 8%;
+    --success: 152 60% 40%;
+    --success-foreground: 0 0% 100%;
+
+    /* Module-specific colors — cada módulo com identidade própria */
+    --efd-primary: 217 91% 59%;
+    --efd-secondary: 220 49% 8%;
+    --efd-glow: 217 91% 66%;
+
+    --ecf-primary: 186 80% 38%;
+    --ecf-secondary: 220 49% 8%;
+    --ecf-glow: 186 80% 52%;
+
+    --esocial-primary: 248 62% 54%;
+    --esocial-secondary: 220 49% 8%;
+    --esocial-glow: 248 65% 64%;
+
+    --reforma-primary: 25 92% 52%;
+    --reforma-secondary: 220 49% 8%;
+    --reforma-glow: 28 96% 62%;
+
+    --border: 220 16% 88%;
+    --input: 220 16% 88%;
+    --ring: 217 91% 59%;
+    --chart-1: 217 91% 59%;
+    --chart-2: 220 49% 8%;
+    --chart-3: 239 23% 46%;
+    --chart-4: 217 91% 70%;
+    --chart-5: 239 23% 60%;
+    --radius: 0.75rem;
+
+    /* Sidebar — Deep Navy */
+    --sidebar-background: 220 49% 8%;
+    --sidebar-foreground: 220 23% 97%;
+    --sidebar-primary: 217 91% 59%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 40% 14%;
+    --sidebar-accent-foreground: 220 23% 97%;
+    --sidebar-border: 220 35% 16%;
+    --sidebar-ring: 217 91% 59%;
+  }
+
+  .dark {
+    --background: 220 49% 8%;
+    --foreground: 220 23% 96%;
+    --card: 220 45% 11%;
+    --card-foreground: 220 23% 96%;
+    --popover: 220 45% 11%;
+    --popover-foreground: 220 23% 96%;
+
+    --primary: 217 91% 68%;
+    --primary-foreground: 220 49% 8%;
+    --primary-glow: 217 91% 60%;
+
+    --secondary: 220 35% 16%;
+    --secondary-foreground: 220 23% 96%;
+
+    --muted: 220 35% 16%;
+    --muted-foreground: 220 15% 65%;
+
+    --accent: 239 40% 72%;
+    --accent-foreground: 220 49% 8%;
+
+    --destructive: 0 72% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --warning: 38 92% 60%;
+    --warning-foreground: 220 49% 8%;
+    --success: 152 60% 55%;
+    --success-foreground: 220 49% 8%;
+
+    --efd-primary: 216 90% 52%;
+    --efd-secondary: 220 23% 92%;
+    --efd-glow: 217 91% 68%;
+
+    --ecf-primary: 186 84% 46%;
+    --ecf-secondary: 220 23% 92%;
+    --ecf-glow: 186 86% 64%;
+
+    --esocial-primary: 248 66% 56%;
+    --esocial-secondary: 220 23% 92%;
+    --esocial-glow: 249 72% 70%;
+
+    --reforma-primary: 27 96% 48%;
+    --reforma-secondary: 220 23% 92%;
+    --reforma-glow: 30 96% 66%;
+
+    --border: 220 35% 18%;
+    --input: 220 35% 18%;
+    --ring: 217 91% 68%;
+    --chart-1: 217 91% 68%;
+    --chart-2: 220 23% 90%;
+    --chart-3: 239 40% 74%;
+    --chart-4: 217 91% 78%;
+    --chart-5: 239 40% 82%;
+
+    /* Sidebar */
+    --sidebar-background: 220 55% 6%;
+    --sidebar-foreground: 220 23% 96%;
+    --sidebar-primary: 217 91% 68%;
+    --sidebar-primary-foreground: 220 49% 8%;
+    --sidebar-accent: 220 40% 13%;
+    --sidebar-accent-foreground: 220 23% 96%;
+    --sidebar-border: 220 35% 14%;
+    --sidebar-ring: 217 91% 68%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Manrope", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Manrope", "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  
+  /* Melhorias em inputs */
+  input, textarea, select {
+    @apply transition-all duration-200;
+  }
+  
+  input:focus, textarea:focus, select:focus {
+    @apply ring-2 ring-primary/20;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Glass Effects - Enhanced */
+  .glass-effect {
+    @apply bg-white/90 backdrop-blur-2xl border border-white/40 shadow-2xl;
+  }
+  
+  .glass-effect-dark {
+    @apply dark:bg-background/90 dark:backdrop-blur-2xl dark:border-border/40;
+  }
+  
+  .glass-card {
+    @apply bg-gradient-to-br from-white/95 to-white/80 backdrop-blur-3xl border border-white/50 shadow-2xl relative overflow-hidden;
+  }
+  
+  .glass-card::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-0 transition-opacity duration-500;
+  }
+  
+  .glass-card:hover::before {
+    @apply opacity-100;
+  }
+  
+  .glass-card-dark {
+    @apply dark:from-background/95 dark:to-background/80 dark:backdrop-blur-3xl dark:border-border/50;
+  }
+  
+  /* Gradient Borders */
+  .gradient-border {
+    @apply relative bg-gradient-to-br from-primary via-accent to-success;
+    @apply before:absolute before:inset-[1px] before:rounded-[inherit] before:bg-background;
+  }
+  
+  /* Enhanced Shadows */
+  .shadow-glow-sm {
+    box-shadow: 0 0 20px -5px hsl(var(--primary) / 0.3);
+  }
+  
+  .shadow-glow {
+    box-shadow: 0 0 30px -5px hsl(var(--primary) / 0.4);
+  }
+  
+  .shadow-glow-lg {
+    box-shadow: 0 0 40px 0px hsl(var(--primary) / 0.5);
+  }
+  
+  .shadow-success {
+    box-shadow: 0 10px 40px -10px hsl(var(--success) / 0.4);
+  }
+  
+  .shadow-warning {
+    box-shadow: 0 10px 40px -10px hsl(var(--warning) / 0.4);
+  }
+  
+  .shadow-destructive {
+    box-shadow: 0 10px 40px -10px hsl(var(--destructive) / 0.4);
+  }
+  
+  /* Animations */
+  .animate-blob {
+    animation: blob 7s infinite;
+  }
+  
+  .animation-delay-200 {
+    animation-delay: 0.2s;
+  }
+  
+  .animation-delay-400 {
+    animation-delay: 0.4s;
+  }
+  
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+  
+  .animation-delay-4000 {
+    animation-delay: 4s;
+  }
+  
+  /* Hover effects - Enhanced */
+  .hover-lift {
+    @apply transition-all duration-500 ease-out hover:-translate-y-3 hover:shadow-2xl hover:shadow-primary/10;
+  }
+  
+  .hover-glow {
+    @apply transition-all duration-500 ease-out hover:shadow-2xl hover:shadow-primary/20 hover:scale-[1.02];
+  }
+  
+  .hover-scale {
+    @apply transition-transform duration-300 ease-out hover:scale-[1.03];
+  }
+  
+  .hover-float {
+    @apply transition-all duration-700 ease-out hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/15;
+  }
+  
+  .hover-border-glow {
+    @apply transition-all duration-500 ease-out hover:border-primary/60 hover:shadow-glow;
+  }
+  
+  .hover-shine {
+    @apply relative overflow-hidden transition-all duration-300;
+  }
+  
+  .hover-shine::after {
+    content: '';
+    @apply absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent;
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+  }
+  
+  .hover-shine:hover::after {
+    transform: translateX(100%);
+  }
+  
+  /* Gradient backgrounds */
+  .bg-gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
+  }
+  
+  .bg-gradient-success {
+    background: linear-gradient(135deg, hsl(var(--success)) 0%, hsl(158 64% 52%) 100%);
+  }
+  
+  .bg-gradient-warning {
+    background: linear-gradient(135deg, hsl(var(--warning)) 0%, hsl(45 93% 47%) 100%);
+  }
+  
+  .bg-gradient-destructive {
+    background: linear-gradient(135deg, hsl(var(--destructive)) 0%, hsl(0 84% 60%) 100%);
+  }
+  
+  /* Gradiente animado */
+  .gradient-animate {
+    background-size: 200% 200%;
+    animation: gradient 3s ease infinite;
+  }
+  
+  /* Shimmer effect */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--primary) / 0.1),
+      transparent
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+  
+  /* Table hover effects */
+  .table-row-hover {
+    @apply transition-colors duration-150 hover:bg-muted/50 cursor-pointer;
+  }
+  
+  @keyframes gradient {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+  
+  @keyframes blob {
+    0% {
+      transform: translate(0px, 0px) scale(1);
+    }
+    33% {
+      transform: translate(30px, -50px) scale(1.1);
+    }
+    66% {
+      transform: translate(-20px, 20px) scale(0.9);
+    }
+    100% {
+      transform: translate(0px, 0px) scale(1);
+    }
+  }
+  
+  /* Scrollbar estilizado */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.3);
+    border-radius: 4px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.5);
+  }
+  
+  /* Pulse slow animation */
+  @keyframes pulse-slow {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.9;
+      transform: scale(1.05);
+    }
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 3s ease-in-out infinite;
+  }
+  
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+}
