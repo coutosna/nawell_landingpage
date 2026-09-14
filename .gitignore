@@ -8,7 +8,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+# NOTA: dist/ é commitado de propósito para o deploy na Vercel
+# (o pipeline legacy ignora o buildCommand). Rebuild + commit ao mudar o front.
 dist-ssr
 *.local
 
