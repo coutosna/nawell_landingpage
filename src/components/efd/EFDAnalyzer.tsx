@@ -117,33 +117,49 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
           });
           return;
         }
-        if (icmsList.length > 1) {
+
+        const icmsParsed = icmsList.map(f => ({
+          ...parseEFD(f.texto),
+          fontes: { arquivos: [f.nome], quantidade: 1 },
+        }));
+
+        // Consolidar CNPJs distintos somaria empresas diferentes num mesmo laudo.
+        const cnpjs = new Set(icmsParsed.map(d => d.cadastro.cnpj).filter(Boolean));
+        if (cnpjs.size > 1) {
           toast({
-            title: "Um arquivo por período",
-            description: "A apuração do bloco E é do período; envie um arquivo SPED Fiscal por vez.",
+            title: "Arquivos de empresas diferentes",
+            description: `Foram identificados ${cnpjs.size} CNPJs distintos. Envie um cliente por vez.`,
             variant: "destructive",
           });
           return;
         }
 
-        const parsed: EFDData = {
-          ...parseEFD(icmsList[0].texto),
-          fontes: { arquivos: [icmsList[0].nome], quantidade: 1 },
-        };
-        const alertasIdentificados = analisarAlertas(parsed);
+        const periodos = icmsParsed.map(d => `${d.cadastro.periodoInicial}-${d.cadastro.periodoFinal}`);
+        if (new Set(periodos).size !== periodos.length) {
+          toast({
+            title: "Períodos repetidos",
+            description: "Há mais de um arquivo cobrindo o mesmo período — as apurações seriam somadas em duplicidade. Confira a seleção.",
+            variant: "destructive",
+          });
+          return;
+        }
 
-        setEfdContent(icmsList[0].texto);
-        setEfdData(parsed);
+        const parsedData = mergeEFDData(icmsParsed);
+        const content = mergeEFDContents(icmsList.map(f => f.texto));
+        const alertasIdentificados = analisarAlertas(parsedData);
+
+        setEfdContent(content);
+        setEfdData(parsedData);
         setAlertas(alertasIdentificados);
-        setArquivosNomes([icmsList[0].nome]);
+        setArquivosNomes(icmsList.map(f => f.nome));
         setActiveTab('results');
 
-        const conferencias = parsed.icmsIpi?.conferencias ?? [];
+        const conferencias = parsedData.icmsIpi?.conferencias ?? [];
         const conferidas = conferencias.filter(c => c.fechou).length;
         const divergentes = conferencias.length - conferidas;
         toast({
           title: "Apuração ICMS/IPI lida",
-          description: `${conferencias.length} conferência${conferencias.length === 1 ? '' : 's'} de fechamento, ${conferidas} confere${conferidas === 1 ? '' : 'm'} e ${divergentes} não · ${alertasIdentificados.length} alerta${alertasIdentificados.length === 1 ? '' : 's'}.`,
+          description: `${icmsParsed.length} arquivo${icmsParsed.length === 1 ? '' : 's'} · ${conferencias.length} conferência${conferencias.length === 1 ? '' : 's'} de fechamento, ${conferidas} confere${conferidas === 1 ? '' : 'm'} e ${divergentes} não · ${alertasIdentificados.length} alerta${alertasIdentificados.length === 1 ? '' : 's'}.`,
         });
 
         if (arquivosComErro.length > 0) {

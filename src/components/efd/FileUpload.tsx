@@ -99,10 +99,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelect }) => {
             </div>
             <div>
               <CardTitle className="font-display text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-                Upload EFD Contribuições
+                Upload EFD
               </CardTitle>
               <CardDescription className="mt-2 text-base font-medium">
-                Faça upload de um ou vários arquivos .txt para análise automática e inteligente
+                Contribuições (PIS/COFINS) ou SPED Fiscal (ICMS/IPI) — vários arquivos .txt, ex.: um por mês, são consolidados
               </CardDescription>
             </div>
           </div>

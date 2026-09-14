@@ -5,6 +5,7 @@
 
 import { EFDData } from './efdParser';
 import { consolidarRiscoFiscal } from './fiscalCalculations';
+import { EFDIcmsIpiData, E110Icms, E520Ipi } from './efdIcmsIpiParser';
 
 const formatDateExtended = (dateStr: string): string => {
   if (!dateStr || dateStr.length !== 8) return '';
@@ -45,6 +46,108 @@ const mergeApuracao = (apuracoes: Apuracao[]): Apuracao =>
 
 export const mergeEFDContents = (contents: string[]): string =>
   contents.filter(c => c && c.trim()).join('\n');
+
+/**
+ * Soma os campos numéricos de objetos com a mesma forma (ex.: resumos, E110, E520).
+ */
+const somarCampos = <T extends Record<string, number>>(objetos: T[]): T => {
+  const chaves = Object.keys(objetos[0] ?? {}) as Array<keyof T>;
+  const out = {} as T;
+  for (const k of chaves) {
+    out[k] = objetos.reduce((acc, o) => acc + (o[k] ?? 0), 0) as T[keyof T];
+  }
+  return out;
+};
+
+const primeiroOuUltimo = (valores: string[], posicao: 'primeiro' | 'ultimo'): string => {
+  const naoVazios = valores.filter(v => v !== '');
+  if (naoVazios.length === 0) return '';
+  return posicao === 'primeiro' ? naoVazios[0] : naoVazios[naoVazios.length - 1];
+};
+
+/**
+ * Consolida os dados do bloco E (apuração ICMS/IPI) de múltiplos SPED Fiscal.
+ * - E110/E520 são somados (apuração consolidada do período)
+ * - E111/E115/E116/E510/E530 são concatenados (histórico mês a mês)
+ * - Conferências de fechamento preservadas por arquivo/competência
+ */
+const mergeIcmsIpi = (datas: EFDData[]): EFDIcmsIpiData => {
+  const fiscais = datas
+    .map(d => d.icmsIpi)
+    .filter((x): x is EFDIcmsIpiData => Boolean(x));
+
+  const e110List = fiscais
+    .map(f => f.apuracaoIcms.e110)
+    .filter((x): x is E110Icms => Boolean(x));
+  const e110: E110Icms | null =
+    e110List.length === 0
+      ? null
+      : {
+          ...somarCampos(e110List),
+          debitos: e110List.reduce((acc, x) => acc + x.debitos, 0),
+          creditos: e110List.reduce((acc, x) => acc + x.creditos, 0),
+          saldoRecalculado: e110List.reduce((acc, x) => acc + x.debitos, 0) - e110List.reduce((acc, x) => acc + x.creditos, 0),
+        };
+
+  const e520List = fiscais
+    .map(f => f.apuracaoIpi.e520)
+    .filter((x): x is E520Ipi => Boolean(x));
+  const e520: E520Ipi | null =
+    e520List.length === 0
+      ? null
+      : (() => {
+          const base = somarCampos(e520List);
+          return {
+            ...base,
+            saldoRecalculado: e520List.reduce((acc, x) => acc + x.saldoRecalculado, 0),
+            saldoDeclarado: e520List.reduce((acc, x) => acc + x.saldoDeclarado, 0),
+          };
+        })();
+
+  return {
+    cadastro: {
+      cnpj: primeiroOuUltimo(fiscais.map(f => f.cadastro.cnpj), 'primeiro'),
+      razaoSocial: primeiroOuUltimo(fiscais.map(f => f.cadastro.razaoSocial), 'primeiro'),
+      uf: primeiroOuUltimo(fiscais.map(f => f.cadastro.uf), 'primeiro'),
+      municipio: primeiroOuUltimo(fiscais.map(f => f.cadastro.municipio), 'primeiro'),
+      periodoInicial: primeiroOuUltimo(fiscais.map(f => f.cadastro.periodoInicial), 'primeiro'),
+      periodoFinal: primeiroOuUltimo(fiscais.map(f => f.cadastro.periodoFinal), 'ultimo'),
+      periodoInicialDisplay: primeiroOuUltimo(fiscais.map(f => f.cadastro.periodoInicialDisplay), 'primeiro'),
+      periodoFinalDisplay: primeiroOuUltimo(fiscais.map(f => f.cadastro.periodoFinalDisplay), 'ultimo'),
+    },
+    leiaute: 'efd-icms-ipi',
+    registros: fiscais.reduce((acc, f) => {
+      for (const [reg, qtd] of Object.entries(f.registros)) {
+        acc[reg] = (acc[reg] ?? 0) + qtd;
+      }
+      return acc;
+    }, {} as Record<string, number>),
+    apuracaoIcms: {
+      periodoInicio: primeiroOuUltimo(fiscais.map(f => f.apuracaoIcms.periodoInicio), 'primeiro'),
+      periodoFim: primeiroOuUltimo(fiscais.map(f => f.apuracaoIcms.periodoFim), 'ultimo'),
+      e110,
+      e111: fiscais.flatMap(f => f.apuracaoIcms.e111),
+      e115: fiscais.flatMap(f => f.apuracaoIcms.e115),
+      e116: fiscais.flatMap(f => f.apuracaoIcms.e116),
+    },
+    apuracaoIpi: {
+      indApur: primeiroOuUltimo(fiscais.map(f => f.apuracaoIpi.indApur), 'primeiro'),
+      periodoInicio: primeiroOuUltimo(fiscais.map(f => f.apuracaoIpi.periodoInicio), 'primeiro'),
+      periodoFim: primeiroOuUltimo(fiscais.map(f => f.apuracaoIpi.periodoFim), 'ultimo'),
+      e520,
+      e510: fiscais.flatMap(f => f.apuracaoIpi.e510),
+      e530: fiscais.flatMap(f => f.apuracaoIpi.e530),
+    },
+    conferencias: fiscais.flatMap(f => f.conferencias),
+    resumo: somarCampos(
+      fiscais.map(f => f.resumo),
+    ),
+    fontes: {
+      arquivos: fiscais.flatMap(f => f.fontes?.arquivos ?? []),
+      quantidade: fiscais.length,
+    },
+  };
+};
 
 /**
  * Consolida os dados parseados de múltiplos arquivos EFD.
@@ -93,6 +196,7 @@ export const mergeEFDData = (datas: EFDData[]): EFDData => {
 
   return {
     leiaute: leiautes.size === 1 ? base.leiaute : 'desconhecido',
+    icmsIpi: leiautes.size === 1 && base.leiaute === 'efd-icms-ipi' ? mergeIcmsIpi(sorted) : undefined,
     cadastro: {
       ...base.cadastro,
       periodoInicial,

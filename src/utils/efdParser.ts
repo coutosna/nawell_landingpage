@@ -1100,7 +1100,9 @@ export interface ResumoRiscosDashboard {
 }
 
 const difConferencia = (data: EFDData, id: ConferenciaDeFechamento['id']): number =>
-  data.icmsIpi?.conferencias.find(c => c.id === id)?.diferenca ?? 0;
+  (data.icmsIpi?.conferencias ?? [])
+    .filter(c => c.id === id)
+    .reduce((acc, c) => acc + c.diferenca, 0);
 
 export const montarResumoRiscos = (data: EFDData): ResumoRiscosDashboard => {
   if (data.leiaute === 'efd-icms-ipi') {
