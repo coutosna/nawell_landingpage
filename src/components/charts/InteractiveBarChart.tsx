@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { A11yChartTable } from '@/components/a11y/A11yChartTable';
 import { ChevronLeft, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -160,6 +161,12 @@ export function InteractiveBarChart({
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+
+        <A11yChartTable
+          caption={history.length === 0 ? `${title} — valores por item.` : `${title} — detalhamento do nível atual.`}
+          headers={['Item', 'Valor']}
+          rows={currentData.map((item) => [item.name, valueFormatter(item.value)])}
+        />
       </CardContent>
     </Card>
   );

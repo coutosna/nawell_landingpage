@@ -9,6 +9,7 @@ import { parseEFD, analisarAlertas, detectarLeiaute, EFDData, AlertaFiscal } fro
 import { mergeEFDData, mergeEFDContents } from '@/utils/efdMerge';
 import { FiscalSummaryCards } from '@/components/dashboard/FiscalSummaryCards';
 import { AlertsPanel } from '@/components/dashboard/AlertsPanel';
+import { A11yListenButton } from '@/components/a11y/A11yListenButton';
 import { useToast } from '@/hooks/use-toast';
 
 // Lazy load dos componentes pesados
@@ -38,6 +39,36 @@ interface EFDAnalyzerProps {
 
 const LEIAUTE_LABEL: Record<string, string> = {
   'desconhecido': 'obrigação não identificada',
+};
+
+const formatMoeda = (value: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+const montarResumoExecutivo = (data: EFDData, alertas: AlertaFiscal[]): string => {
+  const cad = data.cadastro;
+  const r = data.resumo;
+  const partes = [
+    `Análise fiscal da empresa ${cad.razaoSocial || 'não informada'}, CNPJ ${cad.cnpj || 'não informado'}.`,
+    `Período de ${cad.periodoInicialDisplay} a ${cad.periodoFinalDisplay}.`,
+    data.regime?.descricao ? `Regime tributário: ${data.regime.descricao}.` : '',
+    `Receita bruta de ${formatMoeda(r.totalVendas)}.`,
+  ];
+
+  if (data.leiaute === 'efd-icms-ipi') {
+    const conf = data.icmsIpi?.conferencias ?? [];
+    const fechadas = conf.filter(c => c.fechou).length;
+    partes.push(
+      `Apuradas ${conf.length} conferências de fechamento do bloco E, sendo ${fechadas} com saldo igual ao declarado.`,
+      `Saldo de ICMS a transportar de ${formatMoeda(r.icmsTransportar)} e saldo de IPI de ${formatMoeda(r.ipiSaldo)}.`,
+    );
+  } else {
+    partes.push(
+      `PIS de ${formatMoeda(r.totalPIS)} e COFINS de ${formatMoeda(r.totalCOFINS)}.`,
+    );
+  }
+
+  partes.push(`${alertas.length} alerta${alertas.length === 1 ? '' : 's'} fiscal${alertas.length === 1 ? '' : 'is'} identificados na análise.`);
+  return partes.filter(Boolean).join(' ');
 };
 
 export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
@@ -349,6 +380,16 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
           <TabsContent value="results" className="mt-6">
           {efdData ? (
             <div className="space-y-6 animate-fade-in">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <p className="text-sm text-muted-foreground font-medium">
+                  Resumo executivo da análise fiscal — navegue pelas abas para detalhes.
+                </p>
+                <A11yListenButton
+                  text={montarResumoExecutivo(efdData, alertas)}
+                  label="Ouvir resumo executivo"
+                />
+              </div>
+
               <FiscalSummaryCards efdData={efdData} />
 
               <AlertsPanel alertas={alertas} efdData={efdData} />

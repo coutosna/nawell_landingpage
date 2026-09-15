@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { NaWellMark } from '@/components/ecf/NaWellBrand';
+import { A11yToggle } from '@/components/a11y/A11yToggle';
 import { Lock, User } from 'lucide-react';
 
 export default function Login() {
@@ -120,6 +121,10 @@ export default function Login() {
           </form>
         </CardContent>
       </Card>
+
+      <div className="relative z-10 mt-6 animate-fade-in">
+        <A11yToggle variant="full" className="bg-white/10 text-white hover:bg-white/15 border-white/20 shadow-sm backdrop-blur-sm" />
+      </div>
     </div>
   );
 }

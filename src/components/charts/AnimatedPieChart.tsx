@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector, Legend, Tooltip } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { A11yChartTable } from '@/components/a11y/A11yChartTable';
 import { TrendingUp } from 'lucide-react';
 
 interface PieDataPoint {
@@ -186,6 +187,15 @@ export function AnimatedPieChart({
             );
           })}
         </div>
+
+        <A11yChartTable
+          caption={`${title} — dados por item. Total: ${valueFormatter(total)}`}
+          headers={['Item', 'Valor', 'Participação']}
+          rows={dataWithColors.map((item) => {
+            const percent = (item.value / total) * 100;
+            return [item.name, valueFormatter(item.value), `${percent.toFixed(1)}%`];
+          })}
+        />
       </CardContent>
     </Card>
   );

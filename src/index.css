@@ -2,6 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== Acessibilidade — pessoas com deficiência visual =====
+   Ativado quando o html ganha a classe .a11y-accessible (ver
+   AccessibilityContext). Garante alto contraste, foco bem visível e
+   desativa animações que atrapalham leitores de tela e baixa visão. */
+
+html.a11y-accessible {
+  /* Texto e fundos em contraste mais forte */
+  --border: 220 12% 38%;
+  --input: 220 12% 38%;
+  --muted: 0 0% 88%;
+  --muted-foreground: 0 0% 20%;
+  --secondary: 220 14% 86%;
+}
+
+html.a11y-accessible.dark {
+  --border: 220 20% 55%;
+  --input: 220 20% 55%;
+  --muted: 220 30% 24%;
+  --muted-foreground: 220 20% 88%;
+  --secondary: 220 30% 24%;
+}
+
+html.a11y-accessible :focus-visible {
+  outline: 3px solid color-mix(in srgb, hsl(var(--ring)) 60%, white) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 6px color-mix(in srgb, hsl(var(--ring)) 25%, transparent) !important;
+}
+
+/* Reduz/anula animações — essencial para leitores de tela e quem tem tonturas */
+html.a11y-accessible *,
+html.a11y-accessible *::before,
+html.a11y-accessible *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* Barras de progresso e fill sem gradiente ambíguo */
+html.a11y-accessible .glass-card {
+  background: hsl(var(--card));
+  border-color: hsl(var(--border));
+}
+
+html.a11y-accessible thead th,
+html.a11y-accessible [role="columnheader"] {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+/* Links e texto com gradiente continuam legíveis no modo acessível */
+html.a11y-accessible .bg-clip-text {
+  background: none !important;
+  color: hsl(var(--foreground)) !important;
+}
+
 @layer utilities {
   /* Esconde scrollbar mas mantém funcionalidade */
   .hide-scrollbar {

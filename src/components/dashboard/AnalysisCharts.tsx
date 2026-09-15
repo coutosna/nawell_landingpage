@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { A11yChartTable } from '@/components/a11y/A11yChartTable';
 import { EFDData } from '@/utils/efdParser';
 import { TrendingUp, FileText } from 'lucide-react';
 
@@ -122,6 +123,17 @@ export const AnalysisCharts: React.FC<AnalysisChartsProps> = ({ data }) => {
               <Bar dataKey="imposto" fill="hsl(var(--chart-3))" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
+
+          <A11yChartTable
+            caption="Produtos com maior impacto tributário em PIS e COFINS (8 maiores)"
+            headers={['Produto', 'NCM', 'Imposto', 'Alíquota Efetiva']}
+            rows={topImpostos.map((item) => [
+              item.produto,
+              item.ncm,
+              formatCurrency(item.imposto),
+              `${item.aliquotaEfetiva}%`,
+            ])}
+          />
         </CardContent>
       </Card>
 
@@ -160,6 +172,12 @@ export const AnalysisCharts: React.FC<AnalysisChartsProps> = ({ data }) => {
               </div>
             ))}
           </div>
+
+          <A11yChartTable
+            caption="Operações por CFOP — valores e distribuição"
+            headers={['CFOP', 'Valor', 'Participação']}
+            rows={cfopComPercentual.map((item) => [`CFOP ${item.cfop}`, formatCurrency(item.valor), `${item.percentual}%`])}
+          />
         </CardContent>
       </Card>
 
@@ -201,6 +219,12 @@ export const AnalysisCharts: React.FC<AnalysisChartsProps> = ({ data }) => {
               <p className="text-lg font-bold">{formatCurrency(data.resumo.totalCOFINS)}</p>
             </div>
           </div>
+
+          <A11yChartTable
+            caption="Composição tributária — PIS e COFINS apurados no período"
+            headers={['Imposto', 'Valor', 'Participação']}
+            rows={dadosImpostos.map((item) => [item.nome, formatCurrency(item.valor), item.percentual])}
+          />
         </CardContent>
       </Card>
 

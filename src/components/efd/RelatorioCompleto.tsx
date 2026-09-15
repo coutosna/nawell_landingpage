@@ -10,6 +10,7 @@ import {
   Building2, FileBarChart, FileStack, Target, Sparkles, Info, Landmark
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { A11yListenButton } from '@/components/a11y/A11yListenButton';
 import { EFDData } from '@/utils/efdParser';
 import { detectarTodasOportunidades } from '@/utils/detectarOportunidadesTributarias';
 import { gerarRelatoriosTextuais } from '@/utils/gerarRelatorioTextual';
@@ -76,6 +77,29 @@ export const RelatorioCompleto: React.FC<RelatorioCompletoProps> = React.memo(({
     [...oportunidades].sort((a, b) => b.impactoFinanceiro - a.impactoFinanceiro), [oportunidades]);
 
   const topOportunidades = useMemo(() => oportunidadesOrdenadas.slice(0, 5), [oportunidadesOrdenadas]);
+
+  const textoOral = useMemo(() => {
+    const cad = efdData.cadastro;
+    const base = [
+      `Relatório completo de análise fiscal.`,
+      `Empresa ${cad.razaoSocial || 'não informada'}, CNPJ ${cad.cnpj || 'não informado'}, período de ${cad.periodoInicialDisplay || 'início'} a ${cad.periodoFinalDisplay || 'fim'}.`,
+      `Obrigação: ${obrigacaoNome}.`,
+      `Documentos origem: ${qtdArquivos} arquivo${qtdArquivos > 1 ? 's' : ''}.`,
+    ];
+    if (modoIcms) {
+      base.push(
+        `Foram verificadas ${conferenciasIcms.length} conferências de fechamento, sendo ${conferenciasIcms.length - conferenciasDivergentes.length} com saldos consistentes e ${conferenciasDivergentes.length} divergentes, totalizando ${formatMoeda(somaDivergenciasIcms)} em diferenças.`,
+      );
+    } else {
+      base.push(
+        `Receita bruta de ${formatMoeda(totalVendas)}. Diferença principal de ${formatMoeda(divergenciaTotal)}, multa de ${formatMoeda(multaTotal)} e juros de ${formatMoeda(jurosTotal)}. Total geral de risco ${formatMoeda(totalGeralRisco)}.`,
+      );
+    }
+    base.push(
+      `Foram identificadas ${oportunidades.length} oportunidades tributárias, com ganho potencial de ${formatMoeda(ganhoPotencial)}, sendo ${altaPrioridade} de alta prioridade.`,
+    );
+    return base.filter(Boolean).join(' ');
+  }, [efdData, modoIcms, obrigacaoNome, qtdArquivos, conferenciasIcms, conferenciasDivergentes, somaDivergenciasIcms, totalVendas, divergenciaTotal, multaTotal, jurosTotal, totalGeralRisco, oportunidades, ganhoPotencial, altaPrioridade]);
 
   const relatoriosPorId = useMemo(() => {
     const mapa = new Map<string, ReturnType<typeof gerarRelatoriosTextuais>[number]>();
@@ -332,6 +356,11 @@ export const RelatorioCompleto: React.FC<RelatorioCompletoProps> = React.memo(({
               <Button variant="outline" size="sm" className="bg-white/5 border-white/15 text-white hover:bg-white/10" onClick={handleExportMD} disabled={exportando !== null}>
                 <FileText className="mr-2 h-4 w-4" /> {exportando === 'md' ? 'Gerando…' : 'Markdown'}
               </Button>
+              <A11yListenButton
+                text={textoOral}
+                label="Ouvir relatório"
+                className="bg-white/5 border-white/15 text-white hover:bg-white/10"
+              />
             </div>
           </div>
 

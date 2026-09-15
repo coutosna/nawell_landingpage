@@ -6,11 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Search, Download, TrendingUp, AlertTriangle, CheckCircle2, 
-  DollarSign, FileBarChart, Filter, Lightbulb, Target, ShieldAlert 
+import {
+  Search, Download, TrendingUp, AlertTriangle, CheckCircle2,
+  DollarSign, FileBarChart, Filter, Lightbulb, Target, ShieldAlert
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { A11yChartTable } from '@/components/a11y/A11yChartTable';
+import { A11yListenButton } from '@/components/a11y/A11yListenButton';
 import { EFDData } from '@/utils/efdParser';
 import { 
   detectarTodasOportunidades, 
@@ -88,6 +89,22 @@ export const OportunidadesTributarias: React.FC<OportunidadesTributariasProps> =
     return calcularResumoOportunidades(oportunidades);
   }, [oportunidades]);
 
+  // Texto falado pelo botão "Ouvir" — acessibilidade / deficiência visual
+  const resumoOral = useMemo(() => {
+    const porSeveridade = [
+      `alta: ${resumo.porSeveridade['alta'] || 0}`,
+      `média: ${resumo.porSeveridade['media'] || 0}`,
+      `baixa: ${resumo.porSeveridade['baixa'] || 0}`,
+    ].join(', ');
+    const topNcm = resumo.top10NCMs.length > 0
+      ? ` E os NCMs com maior impacto são ${resumo.top10NCMs
+          .slice(0, 3)
+          .map((n, i) => `${i + 1}º, ${n.ncm}, ${formatCurrency(n.impacto)}`)
+          .join('; ')}.`
+      : '';
+    return `Oportunidades Tributárias. Foram identificadas automaticamente ${resumo.totalOportunidades} oportunidades, com potencial de recuperação de ${formatCurrency(resumo.totalImpactoFinanceiro)}. Por severidade, ${porSeveridade}, e ${resumo.porStatus['Reaver'] || 0} itens para reaver via PERD/DCOMP.${topNcm}`;
+  }, [resumo]);
+
   // Filtra oportunidades
   const filteredOportunidades = useMemo(() => {
     return oportunidades.filter(op => {
@@ -153,18 +170,21 @@ export const OportunidadesTributarias: React.FC<OportunidadesTributariasProps> =
       {/* Header Premium */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-efd-primary/10 via-destructive/5 to-background border-2 p-8 shadow-xl">
         <div className="relative z-10">
-          <div className="flex items-center gap-4 mb-3">
-            <div className="p-3 bg-gradient-to-br from-efd-primary to-destructive rounded-xl shadow-lg shadow-efd-primary/30">
-              <Lightbulb className="h-7 w-7 text-white" />
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4 mb-3">
+              <div className="p-3 bg-gradient-to-br from-efd-primary to-destructive rounded-xl shadow-lg shadow-efd-primary/30">
+                <Lightbulb className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-display font-bold bg-gradient-to-r from-efd-primary to-destructive bg-clip-text text-transparent">
+                  Oportunidades Tributárias
+                </h1>
+                <p className="text-muted-foreground font-medium mt-1">
+                  Análise automática de créditos não aproveitados, pagamentos indevidos e inconsistências fiscais
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-4xl font-display font-bold bg-gradient-to-r from-efd-primary to-destructive bg-clip-text text-transparent">
-                Oportunidades Tributárias
-              </h1>
-              <p className="text-muted-foreground font-medium mt-1">
-                Análise automática de créditos não aproveitados, pagamentos indevidos e inconsistências fiscais
-              </p>
-            </div>
+            <A11yListenButton text={resumoOral} label="Ouvir resumo" />
           </div>
         </div>
         <div className="absolute -right-8 -top-8 w-48 h-48 bg-efd-primary/10 rounded-full blur-3xl animate-pulse-slow" />
@@ -255,8 +275,13 @@ export const OportunidadesTributarias: React.FC<OportunidadesTributariasProps> =
                     <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                   ))}
                 </Bar>
-              </BarChart>
+</BarChart>
             </ResponsiveContainer>
+            <A11yChartTable
+              caption="Oportunidades por tipo de classificação"
+              headers={['Tipo', 'Quantidade']}
+              rows={chartDataPorTipo.map((item) => [item.tipo, item.quantidade])}
+            />
           </CardContent>
         </Card>
 
@@ -279,16 +304,16 @@ export const OportunidadesTributarias: React.FC<OportunidadesTributariasProps> =
                   dataKey="value"
                 >
                   {chartDataPorSeveridade.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
+                    <Cell
+                      key={`cell-${index}`}
                       fill={
                         entry.name === 'Alta' ? 'hsl(var(--destructive))' :
                         entry.name === 'Media' ? 'hsl(var(--warning))' : 'hsl(var(--primary))'
-                      } 
+                      }
                     />
                   ))}
                 </Pie>
-                <Tooltip 
+                <Tooltip
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
                     border: '2px solid hsl(var(--primary))',
@@ -297,6 +322,11 @@ export const OportunidadesTributarias: React.FC<OportunidadesTributariasProps> =
                 />
               </PieChart>
             </ResponsiveContainer>
+            <A11yChartTable
+              caption="Oportunidades por severidade"
+              headers={['Severidade', 'Quantidade']}
+              rows={chartDataPorSeveridade.map((item) => [item.name, item.value])}
+            />
           </CardContent>
         </Card>
       </div>

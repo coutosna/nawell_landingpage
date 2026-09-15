@@ -114,6 +114,8 @@ export function AppSidebar() {
                     key={item.path}
                     onClick={() => navigate(item.path)}
                     title={collapsed ? item.title : undefined}
+                    aria-current={active ? 'page' : undefined}
+                    aria-label={`${item.title} — ${item.description}`}
                     className={cn(
                       "group/menu flex w-full items-center gap-3 rounded-xl py-2.5 text-left transition-all duration-200",
                       collapsed ? "justify-center px-0" : "px-3",

@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { A11yToggle } from '@/components/a11y/A11yToggle';
 import { LogOut, Moon, Sun, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -26,15 +27,22 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-border/40 bg-background/90 backdrop-blur-3xl supports-[backdrop-filter]:bg-background/70 shadow-sm">
       <div className="flex h-16 items-center gap-4 px-6">
-        <SidebarTrigger className="hover:bg-muted/60 rounded-xl transition-all duration-300 hover:scale-110 hover:shadow-md" />
-        
+        <SidebarTrigger
+          aria-label="Abrir menu lateral"
+          className="hover:bg-muted/60 rounded-xl transition-all duration-300 hover:scale-110 hover:shadow-md"
+        />
+
         <div className="flex-1" />
 
         <div className="flex items-center gap-3">
+          {/* Modo acessibilidade — leitor de tela / deficiência visual */}
+          <A11yToggle variant="icon" />
+
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleTheme}
+            aria-label={theme === 'light' ? 'Ativar modo escuro' : 'Ativar modo claro'}
             className="rounded-xl hover:bg-muted/60 transition-colors"
           >
             {theme === 'light' ? (
@@ -46,7 +54,11 @@ export function AppHeader() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-3 hover:bg-muted/60 rounded-xl transition-colors px-3">
+              <Button
+                variant="ghost"
+                aria-label="Menu do usuário"
+                className="gap-3 hover:bg-muted/60 rounded-xl transition-colors px-3"
+              >
                 <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center ring-1 ring-border">
                   <User className="h-4 w-4 text-primary-foreground" />
                 </div>

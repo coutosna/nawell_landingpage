@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { A11yChartTable } from '@/components/a11y/A11yChartTable';
 import { ChevronLeft, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -123,7 +124,20 @@ export function TreemapChart({
             .map((node, index) => (
               <div
                 key={index}
-                className="relative group cursor-pointer transition-all duration-300 hover:scale-[1.02]"
+                role="button"
+                tabIndex={node.children && node.children.length > 0 ? 0 : -1}
+                aria-label={`${node.name}, ${node.percentage!.toFixed(1)} por cento do total. ${
+                  node.children && node.children.length > 0
+                    ? `${node.children.length} subcategorias. Pressione Enter para detalhar.`
+                    : ''
+                }`}
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && node.children && node.children.length > 0) {
+                    e.preventDefault();
+                    handleNodeClick(node);
+                  }
+                }}
+                className="relative group cursor-pointer transition-all duration-300 hover:scale-[1.02] focus:outline-2 focus:outline-ring focus:outline-offset-2"
                 style={getSize(node.percentage!, expanded)}
                 onClick={() => handleNodeClick(node)}
                 onMouseEnter={() => setHoveredNode(node)}
@@ -186,6 +200,15 @@ export function TreemapChart({
               </div>
             ))}
         </div>
+
+        <A11yChartTable
+          caption={history.length === 0 ? `${title} — ranking por valor.` : `${title} — detalhamento do nível atual.`}
+          headers={['Categoria', 'Valor', 'Participação']}
+          rows={nodesWithPercentage
+            .slice()
+            .sort((a, b) => b.value - a.value)
+            .map((node) => [node.name, valueFormatter(node.value), `${node.percentage!.toFixed(1)}%`])}
+        />
       </CardContent>
     </Card>
   );
