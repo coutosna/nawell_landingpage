@@ -2,8 +2,11 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { NaWellLogo } from '@/components/ecf/NaWellBrand';
 import { ESocialUpload } from '@/components/esocial/ESocialUpload';
 import { Users2 } from 'lucide-react';
+import { usePageSummary } from '@/contexts/AccessibilityContext';
 
 export default function ESocialModule() {
+  usePageSummary('Módulo eSocial. Gestão e validação de obrigações trabalhistas — envie o evento S-1299 do eSocial para começar.');
+
   return (
     <AppLayout>
       <div className="space-y-8 animate-fade-in font-manrope">

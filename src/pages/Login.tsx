@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePageSummary } from '@/contexts/AccessibilityContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +18,9 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  usePageSummary(
+    'Tela de acesso da NAWELL. Informe usuário e senha e pressione Entrar. Use Alt mais A para ativar o modo de acessibilidade e Alt mais V para ouvir esta página.',
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

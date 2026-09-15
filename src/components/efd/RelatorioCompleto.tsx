@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { A11yListenButton } from '@/components/a11y/A11yListenButton';
+import { usePageSummary } from '@/contexts/AccessibilityContext';
 import { EFDData } from '@/utils/efdParser';
 import { detectarTodasOportunidades } from '@/utils/detectarOportunidadesTributarias';
 import { gerarRelatoriosTextuais } from '@/utils/gerarRelatorioTextual';
@@ -100,6 +101,8 @@ export const RelatorioCompleto: React.FC<RelatorioCompletoProps> = React.memo(({
     );
     return base.filter(Boolean).join(' ');
   }, [efdData, modoIcms, obrigacaoNome, qtdArquivos, conferenciasIcms, conferenciasDivergentes, somaDivergenciasIcms, totalVendas, divergenciaTotal, multaTotal, jurosTotal, totalGeralRisco, oportunidades, ganhoPotencial, altaPrioridade]);
+
+  usePageSummary(textoOral);
 
   const relatoriosPorId = useMemo(() => {
     const mapa = new Map<string, ReturnType<typeof gerarRelatoriosTextuais>[number]>();

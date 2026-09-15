@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Scale } from 'lucide-react';
 import { NaWellLogo } from '@/components/ecf/NaWellBrand';
+import { usePageSummary } from '@/contexts/AccessibilityContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, FileText, ShieldCheck } from 'lucide-react';
 import { ReformaTributariaUpload } from '@/components/reforma/ReformaTributariaUpload';
@@ -22,6 +23,14 @@ export default function ReformaTributariaModule() {
   const [resultados, setResultados] = useState<ResumoAno[] | null>(null);
   const [nomeArquivo, setNomeArquivo] = useState<string>("");
   const [processando, setProcessando] = useState(false);
+
+  const inicio = resultados?.[0];
+  const atual = resultados?.[resultados.length - 1];
+  usePageSummary(
+    inicio && atual
+      ? `Simulação da Reforma Tributária. Carga tributária em ${atual.ano}: ${atual.aliquotaEfetiva.toFixed(1)} por cento sobre base de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(atual.baseTotal)}. Transição de ${inicio.ano} a ${atual.ano}. Navegue pelas abas para comparativos, tabelas e recomendações.`
+      : 'Módulo Reforma Tributária. Envie uma EFD de consumo na aba Upload para simular a transição para IBS e CBS.',
+  );
 
   const handleFileUpload = async (conteudo: string, nome: string) => {
     setProcessando(true);

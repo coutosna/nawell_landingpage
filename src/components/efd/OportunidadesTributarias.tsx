@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { A11yChartTable } from '@/components/a11y/A11yChartTable';
 import { A11yListenButton } from '@/components/a11y/A11yListenButton';
+import { usePageSummary } from '@/contexts/AccessibilityContext';
+import { BarChart, Bar, PieChart, Pie, Cell, Tooltip, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { EFDData } from '@/utils/efdParser';
 import { 
   detectarTodasOportunidades, 
@@ -104,6 +106,8 @@ export const OportunidadesTributarias: React.FC<OportunidadesTributariasProps> =
       : '';
     return `Oportunidades Tributárias. Foram identificadas automaticamente ${resumo.totalOportunidades} oportunidades, com potencial de recuperação de ${formatCurrency(resumo.totalImpactoFinanceiro)}. Por severidade, ${porSeveridade}, e ${resumo.porStatus['Reaver'] || 0} itens para reaver via PERD/DCOMP.${topNcm}`;
   }, [resumo]);
+
+  usePageSummary(resumoOral);
 
   // Filtra oportunidades
   const filteredOportunidades = useMemo(() => {

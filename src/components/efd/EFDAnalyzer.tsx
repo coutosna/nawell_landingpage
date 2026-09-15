@@ -10,6 +10,8 @@ import { mergeEFDData, mergeEFDContents } from '@/utils/efdMerge';
 import { FiscalSummaryCards } from '@/components/dashboard/FiscalSummaryCards';
 import { AlertsPanel } from '@/components/dashboard/AlertsPanel';
 import { A11yListenButton } from '@/components/a11y/A11yListenButton';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { usePageSummary } from '@/contexts/AccessibilityContext';
 import { useToast } from '@/hooks/use-toast';
 
 // Lazy load dos componentes pesados
@@ -78,6 +80,13 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
   const [arquivosNomes, setArquivosNomes] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const { toast } = useToast();
+  const resumoPagina = React.useMemo(
+    () => efdData
+      ? montarResumoExecutivo(efdData, alertas)
+      : 'Análise Fiscal Inteligente, obrigações EFD. Faça o upload de um arquivo EFD para começar. Use Alt mais A para ligar o modo de acessibilidade e Alt mais V para ouvir a página em voz alta.',
+    [efdData, alertas],
+  );
+  usePageSummary(resumoPagina);
 
   // Update active tab when initialTab changes
   React.useEffect(() => {
@@ -412,6 +421,7 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
 
           <TabsContent value="revenue" className="mt-6">
             <Suspense fallback={<TabLoading />}>
+              <ErrorBoundary>
               {efdData && efdContent ? (
                 <ReceitaPorProduto efdTxt={efdContent} />
               ) : (
@@ -428,11 +438,13 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
                 </CardContent>
               </Card>
               )}
+              </ErrorBoundary>
             </Suspense>
           </TabsContent>
 
           <TabsContent value="cfop" className="mt-6">
             <Suspense fallback={<TabLoading />}>
+              <ErrorBoundary>
               {efdData && efdContent ? (
                 <CFOPAnalysis efdTxt={efdContent} efdData={efdData} />
             ) : (
@@ -449,11 +461,13 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
                 </CardContent>
               </Card>
               )}
+              </ErrorBoundary>
             </Suspense>
           </TabsContent>
 
           <TabsContent value="creditos" className="mt-6">
             <Suspense fallback={<TabLoading />}>
+              <ErrorBoundary>
               {efdData && efdContent ? (
                 <CreditosAnalyzer efdData={efdData} efdContent={efdContent} />
             ) : (
@@ -470,11 +484,13 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
                 </CardContent>
               </Card>
               )}
+              </ErrorBoundary>
             </Suspense>
           </TabsContent>
 
           <TabsContent value="ncm" className="mt-6">
             <Suspense fallback={<TabLoading />}>
+              <ErrorBoundary>
               {efdData && efdContent ? (
                 <NCMReport efdTxt={efdContent} />
             ) : (
@@ -491,11 +507,13 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
                 </CardContent>
               </Card>
               )}
+              </ErrorBoundary>
             </Suspense>
           </TabsContent>
 
           <TabsContent value="maps" className="mt-6">
             <Suspense fallback={<TabLoading />}>
+              <ErrorBoundary>
               {efdData && efdContent ? (
                 <Tabs defaultValue="destinos" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
@@ -541,11 +559,13 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
                 </CardContent>
                </Card>
              )}
+              </ErrorBoundary>
             </Suspense>
           </TabsContent>
 
           <TabsContent value="partners" className="mt-6">
             <Suspense fallback={<TabLoading />}>
+              <ErrorBoundary>
               {efdData && efdContent ? (
               <Tabs defaultValue="suppliers" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
@@ -575,11 +595,13 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
                 </CardContent>
               </Card>
               )}
+              </ErrorBoundary>
             </Suspense>
           </TabsContent>
 
           <TabsContent value="oportunidades" className="mt-6">
             <Suspense fallback={<TabLoading />}>
+              <ErrorBoundary>
               {efdData ? (
                 <OportunidadesTributarias efdData={efdData} />
             ) : (
@@ -596,11 +618,13 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
                 </CardContent>
               </Card>
               )}
+              </ErrorBoundary>
             </Suspense>
           </TabsContent>
 
           <TabsContent value="conclusoes" className="mt-6">
             <Suspense fallback={<TabLoading />}>
+              <ErrorBoundary>
               {efdData ? (
                 <Conclusoes efdData={efdData} />
             ) : (
@@ -617,11 +641,13 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
                 </CardContent>
               </Card>
               )}
+              </ErrorBoundary>
             </Suspense>
           </TabsContent>
 
 <TabsContent value="report" className="mt-6">
             <Suspense fallback={<TabLoading />}>
+              <ErrorBoundary>
               {efdData ? (
                 <RelatorioCompleto efdData={efdData} alertas={alertas} />
               ) : (
@@ -638,6 +664,7 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
                 </CardContent>
               </Card>
               )}
+              </ErrorBoundary>
             </Suspense>
           </TabsContent>
 

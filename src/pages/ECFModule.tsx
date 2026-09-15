@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, FileText, Upload, AlertTriangle, Lightbulb, PieChart, List } from 'lucide-react';
 import { NaWellLogo } from '@/components/ecf/NaWellBrand';
+import { usePageSummary } from '@/contexts/AccessibilityContext';
 import { ECFUpload } from '@/components/ecf/ECFUpload';
 import { ECFDashboard } from '@/components/ecf/ECFDashboard';
 import { ECFAlerts } from '@/components/ecf/ECFAlerts';
@@ -24,6 +25,12 @@ export default function ECFModule() {
       setActiveTab("overview");
     }, 800);
   };
+
+  usePageSummary(
+    analise
+      ? `Análise Contábil Fiscal ECF x ECD. Regime tributário: ${analise.regimeTributario}. Navegue pelas abas Resumo, Gráficos, Análise Detalhada, Alertas e Oportunidades para os detalhes.`
+      : 'Módulo ECF x ECD. Envie a Escrituração Contábil Fiscal da empresa na aba Upload para começar a análise.',
+  );
 
   const tabs = [
     { value: "upload", label: "Upload", icon: Upload, disabled: false },

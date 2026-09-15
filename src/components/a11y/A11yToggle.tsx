@@ -28,10 +28,10 @@ export function A11yToggle({ variant = 'icon', className }: A11yToggleProps) {
         aria-pressed={isOn}
         aria-label={
           isOn
-            ? 'Modo de acessibilidade ativado. Clique para desativar.'
-            : 'Ativar modo de acessibilidade para pessoas com deficiência visual.'
+            ? 'Modo de acessibilidade ativado. Clique para desativar, ou pressione Alt e A.'
+            : 'Ativar modo de acessibilidade para pessoas com deficiência visual. Ou pressione Alt e A.'
         }
-        title={`Acessibilidade (${isOn ? 'ativada' : 'desativada'})`}
+        title={`Acessibilidade (${isOn ? 'ativada' : 'desativada'}) — atalho Alt+A`}
         className={cn(
           'rounded-xl hover:bg-muted/60 transition-colors',
           isOn && 'bg-primary/15 text-primary hover:bg-primary/20',
