@@ -81,10 +81,12 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const { toast } = useToast();
   const resumoPagina = React.useMemo(
-    () => efdData
+    () => activeTab !== 'upload' && activeTab !== 'results'
+      ? ''
+      : efdData
       ? montarResumoExecutivo(efdData, alertas)
       : 'Análise Fiscal Inteligente, obrigações EFD. Faça o upload de um arquivo EFD para começar. Use Alt mais A para ligar o modo de acessibilidade e Alt mais V para ouvir a página em voz alta.',
-    [efdData, alertas],
+    [activeTab, efdData, alertas],
   );
   usePageSummary(resumoPagina);
 

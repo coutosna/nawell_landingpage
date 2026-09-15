@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePageSummary } from '@/contexts/AccessibilityContext';
+import { A11yReadPageButton } from '@/components/a11y/A11yReadPageButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,6 +48,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-sidebar p-4 animate-fade-in font-manrope relative overflow-hidden">
+      <A11yReadPageButton variant="floating" />
       {/* Background geometric watermark */}
       <div className="absolute inset-0 opacity-[0.06] pointer-events-none">
         <NaWellMark className="absolute -top-24 -right-24 w-[420px] h-[420px] text-white" />

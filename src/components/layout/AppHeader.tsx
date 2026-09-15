@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { A11yToggle } from '@/components/a11y/A11yToggle';
+import { A11yReadPageButton } from '@/components/a11y/A11yReadPageButton';
 import { LogOut, Moon, Sun, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -37,6 +38,7 @@ export function AppHeader() {
         <div className="flex items-center gap-3">
           {/* Modo acessibilidade — leitor de tela / deficiência visual */}
           <A11yToggle variant="icon" />
+          <A11yReadPageButton />
 
           <Button
             variant="ghost"

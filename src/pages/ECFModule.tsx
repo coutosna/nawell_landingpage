@@ -27,7 +27,9 @@ export default function ECFModule() {
   };
 
   usePageSummary(
-    analise
+    activeTab !== 'upload' && activeTab !== 'overview'
+      ? ''
+      : analise
       ? `Análise Contábil Fiscal ECF x ECD. Regime tributário: ${analise.regimeTributario}. Navegue pelas abas Resumo, Gráficos, Análise Detalhada, Alertas e Oportunidades para os detalhes.`
       : 'Módulo ECF x ECD. Envie a Escrituração Contábil Fiscal da empresa na aba Upload para começar a análise.',
   );

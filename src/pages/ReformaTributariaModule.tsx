@@ -27,7 +27,9 @@ export default function ReformaTributariaModule() {
   const inicio = resultados?.[0];
   const atual = resultados?.[resultados.length - 1];
   usePageSummary(
-    inicio && atual
+    activeTab !== 'upload'
+      ? ''
+      : inicio && atual
       ? `Simulação da Reforma Tributária. Carga tributária em ${atual.ano}: ${atual.aliquotaEfetiva.toFixed(1)} por cento sobre base de ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(atual.baseTotal)}. Transição de ${inicio.ano} a ${atual.ano}. Navegue pelas abas para comparativos, tabelas e recomendações.`
       : 'Módulo Reforma Tributária. Envie uma EFD de consumo na aba Upload para simular a transição para IBS e CBS.',
   );

@@ -8,6 +8,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AccessibilityProvider } from "./contexts/AccessibilityContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { A11yAutoNarrator } from "./components/a11y/A11yAutoNarrator";
 import Login from "./pages/Login";
 import EFDModule from "./pages/EFDModule";
 import ECFModule from "./pages/ECFModule";
@@ -26,6 +27,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <A11yAutoNarrator />
               <Routes>
                 <Route path="/" element={<Login />} />
                 <Route

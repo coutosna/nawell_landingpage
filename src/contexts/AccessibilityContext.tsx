@@ -13,8 +13,10 @@ interface AccessibilityContextType {
   stopSpeaking: () => void;
   /** Registra o resumo narrado de um componente; prefira o hook usePageSummary. */
   registerPageSummary: (order: number, text: string) => () => void;
-  /** Lê em voz alta o resumo registrado da página (ou o conteúdo principal). */
+  /** Lê a tela atual em voz alta; se já estiver falando, interrompe. */
   readPageAloud: () => void;
+  /** Lê a tela atual em voz alta (sem alternar), usado na narração automática. */
+  narratePage: () => void;
 }
 
 /** Atalhos de teclado globais para acessibilidade:
@@ -31,6 +33,40 @@ const AccessibilityContext = createContext<AccessibilityContextType | undefined>
 
 const speechSupported = () =>
   typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+const LIMITE_TEXTO_TELA = 4000;
+
+const dividirEmBlocos = (texto: string, max = 220): string[] => {
+  const frases = texto.replace(/\s+/g, ' ').trim().split(/(?<=[.!?;:])\s+/);
+  const blocos: string[] = [];
+  let atual = '';
+  for (const frase of frases) {
+    if (atual && (atual + ' ' + frase).length > max) {
+      blocos.push(atual);
+      atual = frase;
+    } else {
+      atual = atual ? `${atual} ${frase}` : frase;
+    }
+  }
+  if (atual) blocos.push(atual);
+  return blocos;
+};
+
+const limparTexto = (el: HTMLElement | null) => el?.innerText?.replace(/\s+/g, ' ').trim() ?? '';
+
+/** Sem resumo registrado, lê a aba ativa mais interna (ou o conteúdo principal) da tela. */
+const textoVisivelDaTela = (): string => {
+  const paineis = document.querySelectorAll<HTMLElement>('[role="tabpanel"][data-state="active"]');
+  const painel = paineis.length > 0 ? paineis[paineis.length - 1] : null;
+  if (painel) {
+    const aba = document.querySelector<HTMLElement>(`[role="tab"][aria-controls="${painel.id}"]`);
+    const nomeAba = limparTexto(aba).replace(/^[^\p{L}\p{N}]+/u, '');
+    const corpo = limparTexto(painel);
+    if (corpo) return `${nomeAba ? `Aba ${nomeAba}. ` : ''}${corpo.slice(0, LIMITE_TEXTO_TELA)}`;
+  }
+  const corpo = limparTexto(document.querySelector('main')) || limparTexto(document.body);
+  return corpo ? `${document.title}. ${corpo.slice(0, LIMITE_TEXTO_TELA)}` : `${document.title}. Nenhum conteúdo para narrar nesta tela.`;
+};
 
 export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mode, setMode] = useState<AccessibilityMode>(() => {
@@ -79,14 +115,18 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
   const speak = useCallback((text: string) => {
     if (!speechSupported() || !text.trim()) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'pt-BR';
-    utterance.rate = 1;
-    if (voiceRef.current) utterance.voice = voiceRef.current;
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+    // Chrome corta falas longas (~15s), então o texto vai em blocos por frase.
+    const blocos = dividirEmBlocos(text);
+    blocos.forEach((bloco, i) => {
+      const utterance = new SpeechSynthesisUtterance(bloco);
+      utterance.lang = 'pt-BR';
+      utterance.rate = 1;
+      if (voiceRef.current) utterance.voice = voiceRef.current;
+      if (i === 0) utterance.onstart = () => setSpeaking(true);
+      if (i === blocos.length - 1) utterance.onend = () => setSpeaking(false);
+      utterance.onerror = () => setSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    });
   }, []);
 
   const toggleAccessibility = useCallback(() => {
@@ -100,22 +140,16 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
-  const readPageAloud = useCallback(() => {
-    if (speaking) {
-      stopSpeaking();
-      return;
-    }
+  const narratePage = useCallback(() => {
     const ordens = [...pageSummariesRef.current.keys()];
-    let texto = ordens.length > 0 ? pageSummariesRef.current.get(Math.max(...ordens)) ?? '' : '';
-    if (!texto) {
-      const main = document.querySelector('main');
-      const corpo = main?.innerText?.replace(/\s+/g, ' ').trim() ?? '';
-      texto = corpo.length > 0
-        ? `${document.title}. ${corpo.slice(0, 1400)}`
-        : `${document.title}. Nenhum conteúdo para narrar nesta página.`;
-    }
-    speak(texto);
-  }, [speak, speaking, stopSpeaking]);
+    const resumo = ordens.length > 0 ? pageSummariesRef.current.get(Math.max(...ordens)) ?? '' : '';
+    speak(resumo || textoVisivelDaTela());
+  }, [speak]);
+
+  const readPageAloud = useCallback(() => {
+    if (speaking) stopSpeaking();
+    else narratePage();
+  }, [speaking, stopSpeaking, narratePage]);
 
   // Anuncia por voz quando o modo muda (inclusive pelo atalho Alt+A).
   useEffect(() => {
@@ -154,7 +188,7 @@ export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({
 
   return (
     <AccessibilityContext.Provider
-      value={{ mode, setMode, toggleAccessibility, speaking, speak, stopSpeaking, registerPageSummary, readPageAloud }}
+      value={{ mode, setMode, toggleAccessibility, speaking, speak, stopSpeaking, registerPageSummary, readPageAloud, narratePage }}
     >
       {children}
     </AccessibilityContext.Provider>
@@ -173,5 +207,5 @@ export const useAccessibility = () => {
 export const usePageSummary = (text: string) => {
   const { registerPageSummary } = useAccessibility();
   const [order] = useState(() => ++summaryOrderCounter);
-  useEffect(() => registerPageSummary(order, text), [registerPageSummary, order, text]);
+  useEffect(() => (text ? registerPageSummary(order, text) : undefined), [registerPageSummary, order, text]);
 };
