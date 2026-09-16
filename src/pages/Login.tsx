@@ -47,8 +47,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-sidebar p-4 animate-fade-in font-manrope relative overflow-hidden">
-      <A11yReadPageButton variant="floating" />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-sidebar p-4 animate-fade-in font-manrope relative overflow-hidden">
       {/* Background geometric watermark */}
       <div className="absolute inset-0 opacity-[0.06] pointer-events-none">
         <NaWellMark className="absolute -top-24 -right-24 w-[420px] h-[420px] text-white" />
@@ -128,8 +127,9 @@ export default function Login() {
         </CardContent>
       </Card>
 
-      <div className="relative z-10 mt-6 animate-fade-in">
+      <div className="relative z-10 mt-6 flex flex-wrap items-center justify-center gap-3 animate-fade-in">
         <A11yToggle variant="full" className="bg-white/10 text-white hover:bg-white/15 border-white/20 shadow-sm backdrop-blur-sm" />
+        <A11yReadPageButton variant="inline" className="bg-white/10 text-white hover:bg-white/15 border-white/20 shadow-sm backdrop-blur-sm" />
       </div>
     </div>
   );

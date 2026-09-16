@@ -4,8 +4,8 @@ import { Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface A11yReadPageButtonProps {
-  /** 'icon' para o cabeçalho; 'floating' para telas sem cabeçalho (login, 404). */
-  variant?: 'icon' | 'floating';
+  /** 'icon' no cabeçalho; 'inline' com rótulo; 'floating' fixo no canto da tela. */
+  variant?: 'icon' | 'inline' | 'floating';
   className?: string;
 }
 
@@ -13,6 +13,23 @@ export function A11yReadPageButton({ variant = 'icon', className }: A11yReadPage
   const { speaking, readPageAloud } = useAccessibility();
   const label = speaking ? 'Parar a narração da tela. Atalho Alt e V.' : 'Ouvir a tela em voz alta. Atalho Alt e V.';
   const Icone = speaking ? VolumeX : Volume2;
+
+  if (variant === 'inline') {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        onClick={readPageAloud}
+        aria-pressed={speaking}
+        aria-label={label}
+        title="Ouvir a tela — atalho Alt+V (Option+V no Mac)"
+        className={cn('gap-2', className)}
+      >
+        <Icone className="h-4 w-4" />
+        <span>{speaking ? 'Parar narração' : 'Ouvir a tela'}</span>
+      </Button>
+    );
+  }
 
   if (variant === 'floating') {
     return (
