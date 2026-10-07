@@ -1,0 +1,100 @@
+name: Atualizar dados oficiais
+
+# Todo dia 5 (09:00 UTC = 06:00 em Brasília): a Selic do mês anterior já foi publicada pelo Bacen.
+on:
+  schedule:
+    - cron: '0 9 5 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: atualizar-dados-oficiais
+  cancel-in-progress: false
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Selic mensal (Bacen, série 4390)
+        id: selic
+        continue-on-error: true
+        run: npm run atualizar-selic
+
+      - name: Tabelas 4.3.10, 4.3.11 e 4.3.13 (portal SPED)
+        id: sped
+        continue-on-error: true
+        run: npm run atualizar-tabelas-sped
+
+      - name: Verificar se algo mudou
+        id: mudancas
+        run: |
+          if [ -n "$(git status --porcelain src/data)" ]; then
+            echo "mudou=true" >> "$GITHUB_OUTPUT"
+            git diff --stat src/data
+          else
+            echo "mudou=false" >> "$GITHUB_OUTPUT"
+            echo "Nenhum dado oficial mudou."
+          fi
+
+      - name: Testes e build com os dados novos
+        if: steps.mudancas.outputs.mudou == 'true'
+        run: |
+          npx vitest run
+          npm run build
+
+      - name: Abrir PR com os dados atualizados
+        if: steps.mudancas.outputs.mudou == 'true'
+        run: |
+          MES=$(date -u +%Y-%m)
+          BRANCH="dados-oficiais/$MES"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add src/data dist
+          git commit -m "chore(dados): atualiza Selic e tabelas do SPED de $MES"
+          git push --force origin "$BRANCH"
+
+          CORPO="Atualização automática de $MES.
+
+          - Selic (série 4390): ${{ steps.selic.outcome }}
+          - Tabelas do SPED 4.3.10/4.3.11/4.3.13: ${{ steps.sped.outcome }}
+
+          Testes e build passaram com os dados novos. Depois do merge, publicar na Vercel."
+
+          if gh pr view "$BRANCH" --json url >/dev/null 2>&1; then
+            echo "PR já existe para $BRANCH; branch atualizada."
+          elif ! gh pr create --base main --head "$BRANCH" --title "Dados oficiais de $MES" --body "$CORPO"; then
+            # Sem permissão do Actions para abrir PR: avisa por issue com o link de comparação
+            gh issue create --title "Dados oficiais de $MES prontos para revisão" \
+              --body "$CORPO
+
+          Comparar e abrir o PR: ${{ github.server_url }}/${{ github.repository }}/compare/main...$BRANCH"
+          fi
+
+      - name: Avisar falha de alguma fonte
+        if: steps.selic.outcome == 'failure' || steps.sped.outcome == 'failure'
+        run: |
+          gh issue create --title "Falha ao atualizar dados oficiais ($(date -u +%Y-%m))" --body "Uma das fontes não respondeu nesta execução.
+
+          - Selic (Bacen): ${{ steps.selic.outcome }}
+          - Tabelas do SPED: ${{ steps.sped.outcome }}
+
+          Log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          O sistema continua usando os últimos dados gravados. Rode localmente \`npm run atualizar-selic\` ou \`npm run atualizar-tabelas-sped\` e faça o commit."
+          exit 1
