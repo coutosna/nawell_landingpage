@@ -57,7 +57,8 @@ jobs:
           npx vitest run
           npm run build
 
-      - name: Abrir PR com os dados atualizados
+      # O merge na main dispara o deploy de produção na Vercel (integração Git do projeto)
+      - name: Abrir PR e fazer o merge dos dados atualizados
         if: steps.mudancas.outputs.mudou == 'true'
         run: |
           MES=$(date -u +%Y-%m)
@@ -74,16 +75,16 @@ jobs:
           - Selic (série 4390): ${{ steps.selic.outcome }}
           - Tabelas do SPED 4.3.10/4.3.11/4.3.13: ${{ steps.sped.outcome }}
 
-          Testes e build passaram com os dados novos. Depois do merge, publicar na Vercel."
+          Testes e build passaram com os dados novos. Merge automático; a Vercel publica em seguida.
+          Execução: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          if gh pr view "$BRANCH" --json url >/dev/null 2>&1; then
-            echo "PR já existe para $BRANCH; branch atualizada."
-          elif ! gh pr create --base main --head "$BRANCH" --title "Dados oficiais de $MES" --body "$CORPO"; then
-            # Sem permissão do Actions para abrir PR: avisa por issue com o link de comparação
-            gh issue create --title "Dados oficiais de $MES prontos para revisão" \
-              --body "$CORPO
+          gh pr view "$BRANCH" --json url >/dev/null 2>&1 || \
+            gh pr create --base main --head "$BRANCH" --title "Dados oficiais de $MES" --body "$CORPO"
 
-          Comparar e abrir o PR: ${{ github.server_url }}/${{ github.repository }}/compare/main...$BRANCH"
+          if ! gh pr merge "$BRANCH" --squash --delete-branch; then
+            gh issue create --title "Merge automático dos dados de $MES falhou" \
+              --body "O PR foi aberto, mas não pôde ser mesclado (provável conflito com a main). Revisar: $(gh pr view "$BRANCH" --json url --jq .url)"
+            exit 1
           fi
 
       - name: Avisar falha de alguma fonte
