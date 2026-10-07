@@ -7,10 +7,16 @@ const TABELAS = { '4.3.10': 162, '4.3.11': 164, '4.3.13': 166 };
 const isoDe = (ddmmaaaa) => (ddmmaaaa ? `${ddmmaaaa.slice(4, 8)}-${ddmmaaaa.slice(2, 4)}-${ddmmaaaa.slice(0, 2)}` : null);
 const num = (v) => (v ? Number(v.replace(/\./g, '').replace(',', '.')) : null);
 
+// O SPED serve windows-1252; nem todo build do Node traz esse decodificador, então a faixa 0x80–0x9F é mapeada aqui
+const CP1252 = '\u20ac\ufffd\u201a\u0192\u201e\u2026\u2020\u2021\u02c6\u2030\u0160\u2039\u0152\ufffd\u017d\ufffd' +
+  '\ufffd\u2018\u2019\u201c\u201d\u2022\u2013\u2014\u02dc\u2122\u0161\u203a\u0153\ufffd\u017e\u0178';
+const decodificarWindows1252 = (bytes) =>
+  Array.from(bytes, (b) => (b >= 0x80 && b <= 0x9f ? CP1252[b - 0x80] : String.fromCharCode(b))).join('');
+
 const baixar = async (id) => {
   const resp = await fetch(`${BASE}${id}`);
   if (!resp.ok) throw new Error(`SPED respondeu ${resp.status} para a tabela ${id}`);
-  const texto = new TextDecoder('latin1').decode(await resp.arrayBuffer());
+  const texto = decodificarWindows1252(Buffer.from(await resp.arrayBuffer()));
   const [cabecalho, ...linhas] = texto.split(/\r?\n/).filter(Boolean);
   if (!cabecalho.startsWith('vers')) throw new Error(`Tabela ${id} veio sem cabeçalho de versão`);
   const versao = cabecalho.match(/=\s*([\d.]+)/)?.[1] ?? '';
