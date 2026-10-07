@@ -135,7 +135,7 @@ export const FiscalSummaryCards: React.FC<FiscalSummaryCardsProps> = ({ efdData 
               <p className="text-xs text-muted-foreground font-medium">{resumo.principal.sub}</p>
             </div>
             <div className="space-y-2 p-4 rounded-xl bg-gradient-to-br from-warning/10 to-destructive/5 hover:from-warning/15 transition-colors overflow-hidden">
-              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Multa 20%</p>
+              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Multa de mora</p>
               <p className="font-display text-2xl lg:text-3xl font-bold text-warning dark:text-warning break-words">
                 {formatCurrency(resumo.multa.valor)}
               </p>
@@ -151,6 +151,31 @@ export const FiscalSummaryCards: React.FC<FiscalSummaryCardsProps> = ({ efdData 
               <p className="text-xs text-warning dark:text-warning font-semibold">{resumo.total.sub}</p>
             </div>
           </div>
+          {resumo.cenarioOficio && (
+            <div className="mt-6 pt-4 border-t border-warning/20 grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+              <div className="space-y-1 px-4">
+                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Líquido do período</p>
+                <p className="font-display text-xl font-bold text-foreground break-words">
+                  {formatCurrency(resumo.liquidoPeriodo ?? 0)}
+                </p>
+                <p className="text-xs text-muted-foreground font-medium">Devido − informado, compensando itens pagos a maior</p>
+              </div>
+              <div className="space-y-1 px-4">
+                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Se autuado: multa de ofício</p>
+                <p className="font-display text-xl font-bold text-destructive break-words">
+                  {formatCurrency(resumo.cenarioOficio.multa)}
+                </p>
+                <p className="text-xs text-muted-foreground font-medium">75% do principal (art. 44, I, Lei 9.430/96)</p>
+              </div>
+              <div className="space-y-1 px-4">
+                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Se autuado: total</p>
+                <p className="font-display text-xl font-bold text-destructive break-words">
+                  {formatCurrency(resumo.cenarioOficio.total)}
+                </p>
+                <p className="text-xs text-muted-foreground font-medium">Principal + Multa de ofício + Juros Selic</p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -12,6 +12,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "hash-password": "node server/hash-password.js",
+    "atualizar-selic": "node scripts/atualizar-selic.mjs",
+    "atualizar-tabelas-sped": "node scripts/atualizar-tabelas-sped.mjs",
     "start": "node server/index.js",
     "start:dev": "node --watch server/index.js"
   },

@@ -3,63 +3,40 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileUp, BarChart3, ListTree, AlertTriangle, GitCompare, FileText } from 'lucide-react';
 import { EFDData } from '@/utils/efdParser';
+import { eixoOperacao } from '@/utils/cfopPolicyMonolith';
+import { analisarCreditosPorNatureza } from '@/utils/creditosPorNatureza';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
+const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 interface CreditosAnalyzerProps {
   efdData: EFDData;
   efdContent: string;
 }
 
-export function CreditosAnalyzer({ efdData, efdContent }: CreditosAnalyzerProps) {
+export function CreditosAnalyzer({ efdData }: CreditosAnalyzerProps) {
   const [activeTab, setActiveTab] = useState('visao-geral');
 
-  // Processar créditos dos registros C170
+  // Entradas com CST de crédito (50 a 66), já lidas pelo parser no leiaute oficial do C170
   const creditosData = useMemo(() => {
-    const linhas = efdContent.split('\n');
-    const c170Records: any[] = [];
-    
-    linhas.forEach(linha => {
-      if (linha.startsWith('|C170|')) {
-        const campos = linha.split('|');
-        const registro = {
-          COD_ITEM: campos[2],
-          DESCR_COMPL: campos[3],
-          CFOP: campos[6],
-          CST_PIS: campos[13],
-          VL_BC_PIS: parseFloat(campos[14]?.replace(',', '.') || '0'),
-          ALIQ_PIS: parseFloat(campos[15]?.replace(',', '.') || '0'),
-          VL_PIS: parseFloat(campos[16]?.replace(',', '.') || '0'),
-          CST_COFINS: campos[17],
-          VL_BC_COFINS: parseFloat(campos[18]?.replace(',', '.') || '0'),
-          ALIQ_COFINS: parseFloat(campos[19]?.replace(',', '.') || '0'),
-          VL_COFINS: parseFloat(campos[20]?.replace(',', '.') || '0'),
-        };
-        
-        // Apenas registros com créditos (CST 50-56, 60-66)
-        const cstCredito = ['50','51','52','53','54','55','56','60','61','62','63','64','65','66'];
-        if (cstCredito.includes(registro.CST_PIS) || cstCredito.includes(registro.CST_COFINS)) {
-          c170Records.push(registro);
-        }
-      }
+    const linhas = efdData.vendas.filter(v => {
+      const cst = parseInt(v.pisCst, 10);
+      return eixoOperacao(v.cfop) === 'entrada' && cst >= 50 && cst <= 66;
     });
-
-    const totalLinhas = c170Records.length;
-    const totalPIS = c170Records.reduce((sum, r) => sum + r.VL_PIS, 0);
-    const totalCOFINS = c170Records.reduce((sum, r) => sum + r.VL_COFINS, 0);
-    const totalCreditos = totalPIS + totalCOFINS;
-
+    const totalPIS = linhas.reduce((sum, r) => sum + r.pisValor, 0);
+    const totalCOFINS = linhas.reduce((sum, r) => sum + r.cofinsValor, 0);
     return {
-      linhas: c170Records,
+      linhas,
       totais: {
-        linhasElegiveis: totalLinhas,
+        linhasElegiveis: linhas.length,
         totalPIS,
         totalCOFINS,
-        totalCreditos,
-        totalOrigens: totalCreditos,
-        totalM: 0, // Seria do Bloco M quando disponível
-        diferenca: totalCreditos
-      }
+        totalCreditos: totalPIS + totalCOFINS,
+      },
     };
-  }, [efdContent]);
+  }, [efdData]);
+
+  const naturezas = useMemo(() => analisarCreditosPorNatureza(efdData), [efdData]);
 
   return (
     <div className="space-y-6">
@@ -180,21 +157,21 @@ export function CreditosAnalyzer({ efdData, efdContent }: CreditosAnalyzerProps)
                         <div key={idx} className="p-3 bg-muted/50 rounded-lg border border-border/50">
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex-1">
-                              <p className="font-medium text-sm">{linha.DESCR_COMPL || linha.COD_ITEM}</p>
-                              <p className="text-xs text-muted-foreground">CFOP: {linha.CFOP} | CST PIS: {linha.CST_PIS} | CST COFINS: {linha.CST_COFINS}</p>
+                              <p className="font-medium text-sm">{linha.produto}</p>
+                              <p className="text-xs text-muted-foreground">CFOP: {linha.cfop} | CST PIS: {linha.pisCst} | CST COFINS: {linha.cofinsCst}</p>
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
                               <span className="text-muted-foreground">PIS:</span>
                               <span className="ml-2 font-semibold text-primary">
-                                R$ {linha.VL_PIS.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                R$ {linha.pisValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">COFINS:</span>
                               <span className="ml-2 font-semibold text-efd-primary">
-                                R$ {linha.VL_COFINS.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                R$ {linha.cofinsValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </span>
                             </div>
                           </div>
@@ -222,12 +199,37 @@ export function CreditosAnalyzer({ efdData, efdContent }: CreditosAnalyzerProps)
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="p-8 bg-muted/30 rounded-xl border-2 border-dashed border-border text-center">
-                <ListTree className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">
-                  Tabela de créditos por natureza (01-Revenda, 02-Insumos, 03-Serviços, etc.)
+              {naturezas.linhas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma entrada com crédito nem M105/M505 no arquivo.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Natureza</TableHead>
+                      <TableHead className="text-right">Base declarada (M105)</TableHead>
+                      <TableHead className="text-right">Base C170 por CFOP</TableHead>
+                      <TableHead className="text-right">Crédito PIS (C170)</TableHead>
+                      <TableHead className="text-right">Crédito COFINS (C170)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {naturezas.linhas.map(l => (
+                      <TableRow key={l.natureza}>
+                        <TableCell><span className="font-mono">{l.natureza}</span> · {l.descricao}</TableCell>
+                        <TableCell className="text-right">{moeda(l.baseDeclaradaPIS)}</TableCell>
+                        <TableCell className="text-right">{moeda(l.baseDeduzidaC170)}</TableCell>
+                        <TableCell className="text-right">{moeda(l.creditoPISC170)}</TableCell>
+                        <TableCell className="text-right">{moeda(l.creditoCOFINSC170)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              {naturezas.itensSemNatureza > 0 && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  {naturezas.itensSemNatureza} item(ns) de entrada com CST de crédito e CFOP sem natureza mapeada (base {moeda(naturezas.baseSemNatureza)}).
                 </p>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -275,16 +277,39 @@ export function CreditosAnalyzer({ efdData, efdContent }: CreditosAnalyzerProps)
             <CardHeader>
               <CardTitle>Reconciliação com Bloco M</CardTitle>
               <CardDescription>
-                Comparação entre total de origens (A+C+D+F) e consolidado M105/M505
+                Natureza declarada pelo contribuinte (M105) × natureza deduzida do CFOP das entradas do C170
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="p-8 bg-muted/30 rounded-xl border-2 border-dashed border-border text-center">
-                <GitCompare className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">
-                  Análise waterfall e diferenças por natureza 4.3.7
-                </p>
-              </div>
+              {!naturezas.temDeclaracao ? (
+                <p className="text-sm text-muted-foreground">O arquivo não traz M105/M505: não há declaração para confrontar.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Natureza</TableHead>
+                      <TableHead className="text-right">Declarado (M105)</TableHead>
+                      <TableHead className="text-right">Deduzido (C170)</TableHead>
+                      <TableHead className="text-right">Diferença</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {naturezas.linhas.map(l => (
+                      <TableRow key={l.natureza}>
+                        <TableCell><span className="font-mono">{l.natureza}</span> · {l.descricao}</TableCell>
+                        <TableCell className="text-right">{moeda(l.baseDeclaradaPIS)}</TableCell>
+                        <TableCell className="text-right">{moeda(l.baseDeduzidaC170)}</TableCell>
+                        <TableCell className="text-right">
+                          {l.divergencia === null ? 'não dedutível do C170' : moeda(l.divergencia)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+              <p className="text-xs text-muted-foreground mt-3">
+                O M105 é a fonte primária. A dedução por CFOP cobre só os itens do C170; bases vindas de C190/C191, A, D, F ou C500 aparecem como diferença.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

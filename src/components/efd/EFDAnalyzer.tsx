@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FileUpload } from './FileUpload';
 import { FileEvidenceBar } from './FileEvidenceBar';
-import { parseEFD, analisarAlertas, detectarLeiaute, EFDData, AlertaFiscal } from '@/utils/efdParser';
+import { parseEFD, analisarAlertas, detectarLeiaute, EFDData, AlertaFiscal, RegimeInvalidoError, receitaPrincipal } from '@/utils/efdParser';
 import { mergeEFDData, mergeEFDContents } from '@/utils/efdMerge';
 import { FiscalSummaryCards } from '@/components/dashboard/FiscalSummaryCards';
 import { AlertsPanel } from '@/components/dashboard/AlertsPanel';
@@ -53,7 +53,9 @@ const montarResumoExecutivo = (data: EFDData, alertas: AlertaFiscal[]): string =
     `Análise fiscal da empresa ${cad.razaoSocial || 'não informada'}, CNPJ ${cad.cnpj || 'não informado'}.`,
     `Período de ${cad.periodoInicialDisplay} a ${cad.periodoFinalDisplay}.`,
     data.regime?.descricao ? `Regime tributário: ${data.regime.descricao}.` : '',
-    `Receita bruta de ${formatMoeda(r.totalVendas)}.`,
+    data.leiaute === 'efd-icms-ipi'
+      ? `Movimento de saída de ${formatMoeda(r.totalVendas)}.`
+      : `Receita documental de ${formatMoeda(receitaPrincipal(data))}.`,
   ];
 
   if (data.leiaute === 'efd-icms-ipi') {
@@ -118,6 +120,7 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
       const contents: string[] = [];
       const arquivosComErro: string[] = [];
       const arquivosRecusados: string[] = [];
+      const arquivosRegimeInvalido: string[] = [];
 
       for (const file of files) {
         try {
@@ -135,7 +138,11 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
             arquivosRecusados.push(`${file.name} (${LEIAUTE_LABEL[leiaute]})`);
           }
         } catch (error) {
-          arquivosComErro.push(file.name);
+          if (error instanceof RegimeInvalidoError) {
+            arquivosRegimeInvalido.push(`${file.name}: ${error.message}`);
+          } else {
+            arquivosComErro.push(file.name);
+          }
           console.error(`Erro ao processar ${file.name}:`, error);
         }
       }
@@ -144,6 +151,14 @@ export const EFDAnalyzer = ({ initialTab = "upload" }: EFDAnalyzerProps) => {
         toast({
           title: "Arquivo não identificado",
           description: `${arquivosRecusados.join(', ')}. Envie uma EFD-Contribuições (PIS/COFINS) ou uma EFD ICMS/IPI (SPED Fiscal).`,
+          variant: "destructive",
+        });
+      }
+
+      if (arquivosRegimeInvalido.length > 0) {
+        toast({
+          title: "Arquivo recusado: regime de incidência inválido",
+          description: arquivosRegimeInvalido.join(' '),
           variant: "destructive",
         });
       }

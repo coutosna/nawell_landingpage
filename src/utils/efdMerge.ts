@@ -183,12 +183,20 @@ export const mergeEFDData = (datas: EFDData[]): EFDData => {
     resumoChaves.map(k => [k, sorted.reduce((acc, d) => acc + d.resumo[k], 0)])
   ) as EFDData['resumo'];
 
+  const somar = (f: (d: EFDData) => number) => sorted.reduce((acc, d) => acc + (f(d) || 0), 0);
+
   const receitaDocumental = {
     blocoA: sorted.reduce((acc, d) => acc + d.receitaDocumental.blocoA, 0),
     blocoC: sorted.reduce((acc, d) => acc + d.receitaDocumental.blocoC, 0),
     blocoD: sorted.reduce((acc, d) => acc + d.receitaDocumental.blocoD, 0),
     blocoF: sorted.reduce((acc, d) => acc + d.receitaDocumental.blocoF, 0),
     total: sorted.reduce((acc, d) => acc + d.receitaDocumental.total, 0),
+    exclusoes: {
+      ipi: somar(d => d.receitaDocumental.exclusoes?.ipi),
+      icmsSt: somar(d => d.receitaDocumental.exclusoes?.icmsSt),
+      icmsProprio: somar(d => d.receitaDocumental.exclusoes?.icmsProprio),
+    },
+    naoTributadaF100: somar(d => d.receitaDocumental.naoTributadaF100),
     detalhamento: sorted.flatMap(d => d.receitaDocumental.detalhamento),
   };
 
@@ -215,8 +223,11 @@ export const mergeEFDData = (datas: EFDData[]): EFDData => {
     receitaApurada: {
       pisM210: sorted.reduce((acc, d) => acc + d.receitaApurada.pisM210, 0),
       cofinsM610: sorted.reduce((acc, d) => acc + d.receitaApurada.cofinsM610, 0),
+      pisM400: somar(d => d.receitaApurada.pisM400),
+      cofinsM800: somar(d => d.receitaApurada.cofinsM800),
       total: sorted.reduce((acc, d) => acc + d.receitaApurada.total, 0),
     },
+    creditosDeclarados: sorted.flatMap(d => d.creditosDeclarados ?? []),
     riscoFiscal: consolidarRiscoFiscal(sorted.flatMap(d => d.riscoFiscal.itens)),
     fontes: {
       arquivos: sorted.flatMap(d => d.fontes?.arquivos ?? []),

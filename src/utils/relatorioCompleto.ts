@@ -4,8 +4,7 @@
  * - Geração do documento HTML completo (usado para exportação PDF/HTML)
  */
 
-import { EFDData, apuraDebitoPisCofins } from './efdParser';
-import { buscarAliquotaNCM } from './ncmTable';
+import { EFDData, apuraDebitoPisCofins, apurarDevidoItem, receitaPrincipal } from './efdParser';
 import { OportunidadeTributaria } from './detectarOportunidadesTributarias';
 import { gerarRelatoriosTextuais } from './gerarRelatorioTextual';
 
@@ -61,24 +60,7 @@ const apurarVenda = (
   const pisInf = Math.round(venda.pisValor * 100) / 100;
   const cofinsInf = Math.round(venda.cofinsValor * 100) / 100;
 
-  const aliquotaNCM = buscarAliquotaNCM(venda.ncm, venda.data);
-
-  let aliqPIS = efdData.regime.pisAliquota;
-  let aliqCOFINS = efdData.regime.cofinsAliquota;
-  let fonte = efdData.regime.descricao;
-
-  if (aliquotaNCM) {
-    aliqPIS = aliquotaNCM.aliquotaPIS;
-    aliqCOFINS = aliquotaNCM.aliquotaCOFINS;
-    fonte = `${aliquotaNCM.obs} - ${aliquotaNCM.descricao}`;
-  } else if (venda.pisAliquota > 0 || venda.cofinsAliquota > 0) {
-    if (venda.pisAliquota > 0) aliqPIS = venda.pisAliquota;
-    if (venda.cofinsAliquota > 0) aliqCOFINS = venda.cofinsAliquota;
-    fonte = 'Registro C170';
-  }
-
-  const pisDevido = Math.round((venda.valor * aliqPIS) / 100 * 100) / 100;
-  const cofinsDevido = Math.round((venda.valor * aliqCOFINS) / 100 * 100) / 100;
+  const { pisDevido, cofinsDevido, fonte } = apurarDevidoItem(venda, efdData.regime);
   const pisDif = Math.round(Math.max(0, pisDevido - pisInf) * 100) / 100;
   const cofinsDif = Math.round(Math.max(0, cofinsDevido - cofinsInf) * 100) / 100;
 
@@ -338,7 +320,8 @@ export const gerarHTMLRelatorioCompleto = (
   const altaPrioridade = oportunidades.filter(op => op.severidade === 'alta').length;
   const oportunidadeSemImpacto = oportunidades.filter(op => op.impactoFinanceiro <= 0);
 
-  const totalVendas = efdData.resumo.totalVendas || 0;
+  const totalVendas = receitaPrincipal(efdData) || 0;
+  const movimentoSaida = efdData.resumo.totalVendas || 0;
   const totalCompras = efdData.resumo.totalCompras || 0;
   const somaDivergenciasIcms = conferenciasIcms.reduce((s, c) => s + c.diferenca, 0);
   const divergenciaTotal = modoIcms ? somaDivergenciasIcms : (efdData.riscoFiscal.totalPrincipal || 0);
@@ -567,7 +550,7 @@ export const gerarHTMLRelatorioCompleto = (
         td(p.ncm) +
         td(formatMilhar(p.qtd), true) +
         td(formatMoeda(p.valor), true) +
-        td(totalVendas > 0 ? ((p.valor / totalVendas) * 100).toFixed(2) + '%' : '0,00%', true)
+        td(movimentoSaida > 0 ? ((p.valor / movimentoSaida) * 100).toFixed(2) + '%' : '0,00%', true)
       )).join('')
     : `<tr><td colspan="5" style="text-align:center; color:#5A5B91;">Sem produtos identificados.</td></tr>`;
 
@@ -645,7 +628,7 @@ export const gerarHTMLRelatorioCompleto = (
   </div>
 
   <div class="kpis">
-    <div class="kpi"><div class="label">Receita Total (Vendas)</div><div class="value navy">${formatMoeda(totalVendas)}</div></div>
+    <div class="kpi"><div class="label">${modoIcms ? 'Movimento de saída' : 'Receita documental (A+C+D+F)'}</div><div class="value navy">${formatMoeda(totalVendas)}</div></div>
     <div class="kpi"><div class="label">Total de Aquisições</div><div class="value navy">${formatMoeda(totalCompras)}</div></div>
     <div class="kpi"><div class="label">Total Estimado a Complementar</div><div class="value red">${formatMoeda(divergenciaTotal)}</div></div>
     <div class="kpi"><div class="label">Multa + Juros (est.)</div><div class="value red">${formatMoeda(multaTotal + jurosTotal)}</div></div>

@@ -3,10 +3,14 @@
  * Extrai todos os dados relevantes para análise fiscal
  */
 
-import { buscarAliquotaNCM } from './ncmTable';
+import { classificarNCM, isRevendaMonofasico, buscarAliquotaPorUnidade, buscarAliquotaZero, VERSOES_TABELAS_SPED, type NCMAliquota } from './ncmTable';
+import { PARAMETROS_PRODUTO, ROTULO_PARAMETRO_PRODUTO } from './parametrosProduto';
+import { analisarCreditosPorNatureza } from './creditosPorNatureza';
 import { 
   calcularRiscoFiscalItem, 
   consolidarRiscoFiscal, 
+  selicDesatualizada,
+  selicDisponivelAte,
   type RiscoFiscalItem,
   type ResumoRiscoFiscal 
 } from './fiscalCalculations';
@@ -64,6 +68,119 @@ export const apuraDebitoPisCofins = (venda: {
   cstPermiteDebito(venda.pisCst) &&
   cstPermiteDebito(venda.cofinsCst);
 
+/** O 0110 é obrigatório e fechado (1, 2 ou 3): sem ele não há alíquota de regime para apurar o devido */
+export class RegimeInvalidoError extends Error {
+  constructor(codigo: string) {
+    super(
+      codigo
+        ? `Registro 0110 com código de incidência inválido ("${codigo}"). Valores aceitos: 1, 2 ou 3.`
+        : 'Registro 0110 ausente. Toda EFD-Contribuições deve informar o regime de incidência.'
+    );
+    this.name = 'RegimeInvalidoError';
+  }
+}
+
+export type OrigemAliquota = 'ncm' | 'revenda-monofasico' | 'unidade' | 'nao-avaliavel' | 'c170' | 'regime';
+
+type ItemApuravel = Pick<
+  EFDData['vendas'][number],
+  'ncm' | 'data' | 'cfop' | 'valor' | 'pisCst' | 'cofinsCst' | 'pisAliquota' | 'cofinsAliquota' | 'pisValor' | 'cofinsValor'
+  | 'pisQuantidadeBase' | 'pisAliquotaQuant' | 'cofinsQuantidadeBase' | 'cofinsAliquotaQuant'
+>;
+
+export interface DevidoItem {
+  pisDevido: number;
+  cofinsDevido: number;
+  aliquotaPIS: number;
+  aliquotaCOFINS: number;
+  fonte: string;
+  origem: OrigemAliquota;
+  aliquotaNCM: NCMAliquota | null;
+}
+
+const arred = (v: number) => Math.round(v * 100) / 100;
+
+/**
+ * Devido de PIS/COFINS de uma saída: CST 03 por unidade → revenda de monofásico (zero)
+ * → Tabela 4.3.10 → alíquota do C170 → regime do 0110. Sem base segura, o item é
+ * "não avaliável" e o devido assume o informado.
+ */
+export const apurarDevidoItem = (
+  venda: ItemApuravel,
+  regime: { codigo: string; descricao: string; pisAliquota: number; cofinsAliquota: number },
+  bases: { pis: number; cofins: number } = { pis: venda.valor, cofins: venda.valor }
+): DevidoItem => {
+  const porValor = (pis: number, cofins: number, fonte: string, origem: OrigemAliquota, aliquotaNCM: NCMAliquota | null = null): DevidoItem => ({
+    pisDevido: arred((bases.pis * pis) / 100),
+    cofinsDevido: arred((bases.cofins * cofins) / 100),
+    aliquotaPIS: pis,
+    aliquotaCOFINS: cofins,
+    fonte,
+    origem,
+    aliquotaNCM,
+  });
+  const naoAvaliavel = (fonte: string): DevidoItem => ({
+    pisDevido: arred(venda.pisValor),
+    cofinsDevido: arred(venda.cofinsValor),
+    aliquotaPIS: venda.pisAliquota,
+    aliquotaCOFINS: venda.cofinsAliquota,
+    fonte,
+    origem: 'nao-avaliavel',
+    aliquotaNCM: null,
+  });
+
+  // CST 03: alíquota em reais por unidade de medida, não percentual sobre valor
+  if (venda.pisCst === '03' || venda.cofinsCst === '03') {
+    return {
+      pisDevido: arred((venda.pisQuantidadeBase ?? 0) * (venda.pisAliquotaQuant ?? 0)),
+      cofinsDevido: arred((venda.cofinsQuantidadeBase ?? 0) * (venda.cofinsAliquotaQuant ?? 0)),
+      aliquotaPIS: venda.pisAliquotaQuant ?? 0,
+      aliquotaCOFINS: venda.cofinsAliquotaQuant ?? 0,
+      fonte: 'C170 — quantidade × alíquota por unidade (CST 03)',
+      origem: 'unidade',
+      aliquotaNCM: null,
+    };
+  }
+
+  const ncm = classificarNCM(venda.ncm, venda.data);
+  if (ncm.monofasico && isRevendaMonofasico(venda.cfop, venda.ncm, venda.data)) {
+    return porValor(0, 0, 'Revenda de produto monofásico — alíquota zero', 'revenda-monofasico', ncm.aliquota);
+  }
+  if (ncm.aliquota) {
+    return porValor(ncm.aliquota.aliquotaPIS, ncm.aliquota.aliquotaCOFINS, `${ncm.aliquota.obs} - ${ncm.aliquota.descricao}`, 'ncm', ncm.aliquota);
+  }
+  if (ncm.monofasico) {
+    return naoAvaliavel('Monofásico com alíquota condicionada (Tabela 4.3.10 traz mais de uma alíquota para o NCM)');
+  }
+  if (venda.pisAliquota > 0 || venda.cofinsAliquota > 0) {
+    return porValor(
+      venda.pisAliquota > 0 ? venda.pisAliquota : regime.pisAliquota,
+      venda.cofinsAliquota > 0 ? venda.cofinsAliquota : regime.cofinsAliquota,
+      'Registro C170',
+      'c170'
+    );
+  }
+  // No regime misto a parcela cumulativa e a não cumulativa não se distinguem pelo item
+  if (regime.codigo === '3') {
+    return naoAvaliavel('Regime misto sem alíquota no item — parcela cumulativa/não cumulativa indefinida');
+  }
+  return porValor(regime.pisAliquota, regime.cofinsAliquota, regime.descricao, 'regime');
+};
+
+/**
+ * Número principal de receita: em EFD-Contribuições é a receita documental (A+C+D+F, sem IPI e
+ * ICMS-ST), reconciliável com o bloco M; o somatório do C170 é só "movimento de saída".
+ */
+export const receitaPrincipal = (data: Pick<EFDData, 'leiaute' | 'receitaDocumental' | 'resumo'>): number =>
+  data.leiaute === 'efd-icms-ipi' ? data.resumo.totalVendas : data.receitaDocumental.total;
+
+/** Pares de alíquota (PIS, COFINS) padrão de cada código do 0110 */
+const ALIQUOTAS_PADRAO_REGIME: Record<string, Array<[number, number]>> = {
+  '1': [[1.65, 7.6]],
+  '2': [[0.65, 3]],
+  '3': [[1.65, 7.6], [0.65, 3]],
+};
+
 export interface EFDData {
   cadastro: {
     cnpj: string;
@@ -105,6 +222,11 @@ export interface EFDData {
     cofinsBase: number;
     cofinsAliquota: number;
     cofinsValor: number;
+    /** CST 03: quantidade da base e alíquota em reais por unidade (C170 campos 28/29 e 34/35) */
+    pisQuantidadeBase?: number;
+    pisAliquotaQuant?: number;
+    cofinsQuantidadeBase?: number;
+    cofinsAliquotaQuant?: number;
   }>;
   compras: Array<{
     data: string;
@@ -142,6 +264,8 @@ export interface EFDData {
     cofinsDevido: number;
     cofinsInformado: number;
     cofinsDiferenca: number;
+    /** Saídas cujo devido não pôde ser determinado (regime misto sem alíquota, monofásico com alíquota condicional) */
+    itensNaoAvaliaveis: number;
   };
   receitaDocumental: {
     blocoA: number;
@@ -149,6 +273,10 @@ export interface EFDData {
     blocoD: number;
     blocoF: number;
     total: number;
+    /** Valores retirados do VL_DOC do bloco C e ICMS próprio destacado nas notas de receita */
+    exclusoes: { ipi: number; icmsSt: number; icmsProprio: number };
+    /** Receita sem incidência escriturada no F100 (IND_OPER = 2), já incluída no bloco F */
+    naoTributadaF100: number;
     detalhamento: Array<{
       bloco: string;
       registro: string;
@@ -161,8 +289,13 @@ export interface EFDData {
   receitaApurada: {
     pisM210: number;
     cofinsM610: number;
+    /** Receitas não tributadas (M400/M800, CST 04 a 09) — parte da receita bruta */
+    pisM400: number;
+    cofinsM800: number;
     total: number;
   };
+  /** Bases de crédito declaradas por natureza (M105/M505, Tabela 4.3.7) */
+  creditosDeclarados: Array<{ tributo: 'PIS' | 'COFINS'; natureza: string; cst: string; base: number }>;
   riscoFiscal: ResumoRiscoFiscal;
   /** Metadados dos arquivos de origem da análise (evidência de upload) */
   fontes?: {
@@ -276,6 +409,7 @@ export const parseEFD = (content: string): EFDData => {
     cofinsDevido: 0,
     cofinsInformado: 0,
     cofinsDiferenca: 0,
+    itensNaoAvaliaveis: 0,
     },
     receitaDocumental: {
       blocoA: 0,
@@ -283,18 +417,25 @@ export const parseEFD = (content: string): EFDData => {
       blocoD: 0,
       blocoF: 0,
       total: 0,
+      exclusoes: { ipi: 0, icmsSt: 0, icmsProprio: 0 },
+      naoTributadaF100: 0,
       detalhamento: [],
     },
     receitaApurada: {
       pisM210: 0,
       cofinsM610: 0,
+      pisM400: 0,
+      cofinsM800: 0,
       total: 0,
     },
+    creditosDeclarados: [],
     riscoFiscal: {
       totalPrincipal: 0,
       totalMulta: 0,
       totalJurosEstimado: 0,
       totalGeral: 0,
+      totalMultaOficio: 0,
+      totalGeralOficio: 0,
       itens: [],
     },
   };
@@ -302,7 +443,7 @@ export const parseEFD = (content: string): EFDData => {
   // Maps auxiliares
   const produtosMap = new Map<string, EFDData['produtos'][number]>();
   const documentosC100 = new Map<string, { data: string; numero: string; valor: number }>();
-  const c100ValoresPorNumero = new Map<string, number>();
+  const c100ValoresPorNumero = new Map<string, { receita: number; ipi: number; icmsSt: number; icms: number }>();
   const documentosA100 = new Map<string, { chave: string; numero: string; data: string; valor: number; indOper: string }>();
   const documentosD100 = new Map<string, { chave: string; numero: string; data: string; valor: number; indOper: string }>();
   const documentosF100 = new Map<string, { chave: string; data: string; valor: number; indOper: string; cstPis: string }>();
@@ -392,8 +533,16 @@ export const parseEFD = (content: string): EFDData => {
         });
         // Só saída alimenta receita; a chave composta impede que uma nota de
         // entrada de mesmo número sobrescreva o valor de uma de saída.
+        // Receita bruta exclui IPI e ICMS-ST cobrados como depositário (art. 12, §4º, DL 1.598/77)
         if (indOperC === '1') {
-          c100ValoresPorNumero.set(documentoAtual, valorDocC);
+          const ipi = parseDecimal(campos[25]);
+          const icmsSt = parseDecimal(campos[24]);
+          c100ValoresPorNumero.set(documentoAtual, {
+            receita: Math.max(0, valorDocC - ipi - icmsSt),
+            ipi,
+            icmsSt,
+            icms: parseDecimal(campos[22]),
+          });
         }
         break;
       }
@@ -427,6 +576,10 @@ export const parseEFD = (content: string): EFDData => {
             cofinsBase: parseDecimal(campos[32]),
             cofinsAliquota: parseDecimal(campos[33]),
             cofinsValor: cofinsValorExtraido,
+            pisQuantidadeBase: parseDecimal(campos[28]),
+            pisAliquotaQuant: parseDecimal(campos[29]),
+            cofinsQuantidadeBase: parseDecimal(campos[34]),
+            cofinsAliquotaQuant: parseDecimal(campos[35]),
           };
           
           data.vendas.push(venda);
@@ -660,11 +813,13 @@ export const parseEFD = (content: string): EFDData => {
           cstPis: cstPisF,
         });
 
-        if (indOperF === '1' && valorF100 > 0) {
+        // IND_OPER 2 é receita sem incidência (alíquota zero, isenta etc.): compõe a receita bruta
+        if ((indOperF === '1' || indOperF === '2') && valorF100 > 0) {
           data.receitaDocumental.blocoF += valorF100;
+          if (indOperF === '2') data.receitaDocumental.naoTributadaF100 += valorF100;
           data.receitaDocumental.detalhamento.push({
             bloco: 'F',
-            registro: 'F100',
+            registro: indOperF === '2' ? 'F100 (sem incidência)' : 'F100',
             documento: docF100Chave,
             valor: valorF100,
           });
@@ -673,6 +828,45 @@ export const parseEFD = (content: string): EFDData => {
         documentoAtual = docF100Chave;
         break;
       }
+
+      case 'F500':
+      case 'F510':
+      case 'F550':
+      case 'F560': {
+        // Receita consolidada do lucro presumido (caixa: F500/F510; competência: F550/F560), campo 02
+        const valorConsolidado = parseDecimal(campos[2]);
+        if (valorConsolidado > 0) {
+          data.receitaDocumental.blocoF += valorConsolidado;
+          data.receitaDocumental.detalhamento.push({
+            bloco: 'F',
+            registro,
+            documento: `${registro}-${campos[3] || ''}-${campos[14] || ''}`,
+            valor: valorConsolidado,
+            cfop: registro === 'F500' || registro === 'F550' ? campos[14] || undefined : undefined,
+          });
+        }
+        break;
+      }
+
+      case 'M400':
+      case 'M800': {
+        // Receitas isentas, não alcançadas, alíquota zero ou suspensas: CST=2, VL_TOT_REC=3
+        const valorNaoTributado = parseDecimal(campos[3]);
+        if (registro === 'M400') data.receitaApurada.pisM400 += valorNaoTributado;
+        else data.receitaApurada.cofinsM800 += valorNaoTributado;
+        break;
+      }
+
+      case 'M105':
+      case 'M505':
+        // Base do crédito por natureza: NAT_BC_CRED=2, CST=3, VL_BC_TOT=4
+        data.creditosDeclarados.push({
+          tributo: registro === 'M105' ? 'PIS' : 'COFINS',
+          natureza: campos[2] || '',
+          cst: campos[3] || '',
+          base: parseDecimal(campos[4]),
+        });
+        break;
 
       case 'F120':
         // Bens Incorporados ao Ativo Imobilizado - Operações Geradoras de Créditos
@@ -684,7 +878,7 @@ export const parseEFD = (content: string): EFDData => {
   });
 
   // Aplicar regras de CFOP nas vendas do Bloco C
-  // Usa o VL_DOC do C100 (autoridade) uma única vez por documento de saída,
+  // Usa o VL_DOC do C100 (sem IPI e ICMS-ST) uma única vez por documento de saída,
   // evitando a soma parcial dos itens do C170 e o viés de entradas tratadas como receita.
   const documentosReceitaC = new Set<string>();
   data.vendas.forEach(venda => {
@@ -695,10 +889,14 @@ export const parseEFD = (content: string): EFDData => {
     if (documentosReceitaC.has(chaveDoc)) return;
     documentosReceitaC.add(chaveDoc);
 
-    const valorDoc = c100ValoresPorNumero.get(chaveDoc) ?? 0;
-    if (valorDoc <= 0) return;
+    const doc = c100ValoresPorNumero.get(chaveDoc);
+    const valorDoc = doc?.receita ?? 0;
+    if (!doc || valorDoc <= 0) return;
 
     data.receitaDocumental.blocoC += valorDoc;
+    data.receitaDocumental.exclusoes.ipi += doc.ipi;
+    data.receitaDocumental.exclusoes.icmsSt += doc.icmsSt;
+    data.receitaDocumental.exclusoes.icmsProprio += doc.icms;
     data.receitaDocumental.detalhamento.push({
       bloco: 'C',
       registro: 'C100',
@@ -716,8 +914,8 @@ export const parseEFD = (content: string): EFDData => {
     data.receitaDocumental.blocoF;
 
   // Calcular total da receita apurada (média entre PIS e COFINS)
-  data.receitaApurada.total = 
-    (data.receitaApurada.pisM210 + data.receitaApurada.cofinsM610) / 2;
+  data.receitaApurada.total =
+    (data.receitaApurada.pisM210 + data.receitaApurada.pisM400 + data.receitaApurada.cofinsM610 + data.receitaApurada.cofinsM800) / 2;
 
   // Calcula PIS/COFINS com prioridade: NCM → Registro → Regime
   // Apenas operações de SAÍDA com incidência (CST de débito) entram na apuração
@@ -736,28 +934,8 @@ export const parseEFD = (content: string): EFDData => {
     data.resumo.pisInformado += pisInf;
     data.resumo.cofinsInformado += cofinsInf;
     
-    // Busca alíquota NCM (prioridade 1)
-    const aliquotaNCM = buscarAliquotaNCM(venda.ncm, venda.data);
-    
-    let aliqPIS = data.regime.pisAliquota; // fallback regime
-    let aliqCOFINS = data.regime.cofinsAliquota;
-    let fonte = data.regime.descricao;
-    
-    if (aliquotaNCM) {
-      // Prioridade 1: tabela NCM
-      aliqPIS = aliquotaNCM.aliquotaPIS;
-      aliqCOFINS = aliquotaNCM.aliquotaCOFINS;
-      fonte = `${aliquotaNCM.obs} - ${aliquotaNCM.descricao}`;
-    } else if (venda.pisAliquota > 0 || venda.cofinsAliquota > 0) {
-      // Prioridade 2: registro C170
-      if (venda.pisAliquota > 0) aliqPIS = venda.pisAliquota;
-      if (venda.cofinsAliquota > 0) aliqCOFINS = venda.cofinsAliquota;
-      fonte = 'Registro C170';
-    }
-    
-    // Calcula devidos (arredonda 2 casas)
-    const pisDevido = Math.round((venda.valor * aliqPIS) / 100 * 100) / 100;
-    const cofinsDevido = Math.round((venda.valor * aliqCOFINS) / 100 * 100) / 100;
+    const { pisDevido, cofinsDevido, aliquotaPIS: aliqPIS, aliquotaCOFINS: aliqCOFINS, fonte, origem } = apurarDevidoItem(venda, data.regime);
+    if (origem === 'nao-avaliavel') data.resumo.itensNaoAvaliaveis += 1;
     
     // Acumula devidos
     data.resumo.pisDevido += pisDevido;
@@ -768,7 +946,7 @@ export const parseEFD = (content: string): EFDData => {
     const cofinsDif = Math.round(Math.max(0, cofinsDevido - cofinsInf) * 100) / 100;
     
     // Só adiciona ao risco fiscal se houver NCM na tabela E houver diferença
-    if (aliquotaNCM && (pisDif > 0.01 || cofinsDif > 0.01)) {
+    if (origem === 'ncm' && (pisDif > 0.01 || cofinsDif > 0.01)) {
       const itemRisco = calcularRiscoFiscalItem({
         produto: venda.produto,
         ncm: venda.ncm,
@@ -801,6 +979,10 @@ export const parseEFD = (content: string): EFDData => {
   // Consolida risco fiscal
   data.riscoFiscal = consolidarRiscoFiscal(itensRisco);
 
+  if (data.leiaute === 'efd-contribuicoes' && !ALIQUOTAS_PADRAO_REGIME[data.regime.codigo]) {
+    throw new RegimeInvalidoError(data.regime.codigo);
+  }
+
   // EFD ICMS/IPI: anexa a apuração do bloco E (E100/E110/..., E500/E520/...).
   // O front segue as mesmas abas de Contribuições; só a leitura muda.
   if (data.leiaute === 'efd-icms-ipi') {
@@ -823,31 +1005,67 @@ export const analisarAlertas = (data: EFDData): AlertaFiscal[] => {
   const alertas: AlertaFiscal[] = [];
   let alertaId = 1;
 
+  const paresRegime = ALIQUOTAS_PADRAO_REGIME[data.regime.codigo] ?? [];
+  const divergenciasRegime = new Map<string, { ncm: string; pis: number; cofins: number; itens: number; base: number; produto: string }>();
+  const registrarDivergenciaRegime = (venda: EFDData['vendas'][number]) => {
+    const pis = venda.pisAliquota;
+    const cofins = venda.cofinsAliquota;
+    const coincide = paresRegime.some(([p, c]) => Math.abs(p - pis) < 0.001 && Math.abs(c - cofins) < 0.001);
+    if (coincide || paresRegime.length === 0) return;
+    const chave = `${venda.ncm}|${pis}|${cofins}`;
+    const atual = divergenciasRegime.get(chave) ?? { ncm: venda.ncm, pis, cofins, itens: 0, base: 0, produto: venda.produto };
+    atual.itens += 1;
+    atual.base += venda.pisBase;
+    divergenciasRegime.set(chave, atual);
+  };
+
+  // CST 03 cujo valor por unidade no C170 difere da Tabela 4.3.11 (R14)
+  const divergenciasUnidade = new Map<string, { ncm: string; arquivo: number; tabela: number; unidade: string; codigo: string; itens: number; produto: string }>();
+  const registrarPorUnidade = (venda: EFDData['vendas'][number]) => {
+    const oficial = buscarAliquotaPorUnidade(venda.ncm, venda.data);
+    const arquivo = venda.pisAliquotaQuant ?? 0;
+    if (!oficial || Math.abs(oficial.aliquotaPIS - arquivo) < 0.0001) return;
+    const chave = `${venda.ncm}|${arquivo}`;
+    const atual = divergenciasUnidade.get(chave) ?? { ncm: venda.ncm, arquivo, tabela: oficial.aliquotaPIS, unidade: oficial.unidade, codigo: oficial.codigo, itens: 0, produto: venda.produto };
+    atual.itens += 1;
+    divergenciasUnidade.set(chave, atual);
+  };
+
+  // Saída tributada de NCM citado na Tabela 4.3.13 (alíquota zero) — enquadramento a verificar
+  const candidatosAliquotaZero = new Map<string, { ncm: string; codigos: string; itens: number; base: number; produto: string }>();
+  const registrarAliquotaZero = (venda: EFDData['vendas'][number]) => {
+    const linhas = buscarAliquotaZero(venda.ncm, venda.data);
+    if (linhas.length === 0) return;
+    const atual = candidatosAliquotaZero.get(venda.ncm) ?? {
+      ncm: venda.ncm,
+      codigos: linhas.map(l => `${l.codigo} (${l.descricao.slice(0, 80)})`).join('; '),
+      itens: 0,
+      base: 0,
+      produto: venda.produto,
+    };
+    atual.itens += 1;
+    atual.base += venda.pisBase;
+    candidatosAliquotaZero.set(venda.ncm, atual);
+  };
+
   // G1: Divergências de PIS/COFINS
   data.vendas.forEach(venda => {
     if (!apuraDebitoPisCofins(venda)) return;
 
-    // Busca alíquota na tabela NCM
-    const aliquotaNCM = buscarAliquotaNCM(venda.ncm, venda.data);
-    
-    let aliqPISEsperada = data.regime.pisAliquota;
-    let aliqCOFINSEsperada = data.regime.cofinsAliquota;
-    let fonte = data.regime.descricao;
-    
-    if (aliquotaNCM) {
-      aliqPISEsperada = aliquotaNCM.aliquotaPIS;
-      aliqCOFINSEsperada = aliquotaNCM.aliquotaCOFINS;
-      fonte = `${aliquotaNCM.obs} - ${aliquotaNCM.descricao}`;
-    } else if (venda.pisAliquota > 0 || venda.cofinsAliquota > 0) {
-      // Sem alíquota oficial para o NCM não há como afirmar que a do arquivo está
-      // errada. Usar o regime aqui acusava toda venda cumulativa de empresa mista.
-      if (venda.pisAliquota > 0) aliqPISEsperada = venda.pisAliquota;
-      if (venda.cofinsAliquota > 0) aliqCOFINSEsperada = venda.cofinsAliquota;
-      fonte = 'Registro C170';
-    }
+    // Sem alíquota oficial para o NCM a do C170 é aceita, mas a divergência do regime fica registrada
+    const {
+      pisDevido: valorPISEsperado,
+      cofinsDevido: valorCOFINSEsperado,
+      aliquotaPIS: aliqPISEsperada,
+      aliquotaCOFINS: aliqCOFINSEsperada,
+      fonte,
+      origem,
+    } = apurarDevidoItem(venda, data.regime, { pis: venda.pisBase, cofins: venda.cofinsBase });
+    if (origem === 'c170') registrarDivergenciaRegime(venda);
+    if (origem === 'unidade') registrarPorUnidade(venda);
+    if (venda.pisAliquota > 0) registrarAliquotaZero(venda);
 
     // Verifica divergência PIS
-    const valorPISEsperado = (venda.pisBase * aliqPISEsperada) / 100;
     const divPIS = Math.abs(valorPISEsperado - venda.pisValor);
     
     if (divPIS > 0.5) {
@@ -875,7 +1093,6 @@ export const analisarAlertas = (data: EFDData): AlertaFiscal[] => {
     }
 
     // Verifica divergência COFINS
-    const valorCOFINSEsperado = (venda.cofinsBase * aliqCOFINSEsperada) / 100;
     const divCOFINS = Math.abs(valorCOFINSEsperado - venda.cofinsValor);
     
     if (divCOFINS > 0.5) {
@@ -903,10 +1120,82 @@ export const analisarAlertas = (data: EFDData): AlertaFiscal[] => {
     }
   });
 
+  // G2: alíquota do C170 aceita sem base oficial, mas diferente da do regime (R11)
+  divergenciasRegime.forEach(div => {
+    const padrao = paresRegime.map(([p, c]) => `${p}%/${c}%`).join(' ou ');
+    alertas.push({
+      id: `G2-${alertaId++}`,
+      grupo: 'G2',
+      tipo: 'Alíquota do C170 diverge do regime',
+      severidade: 'baixa',
+      mensagem: `NCM ${div.ncm || 'sem NCM'}: alíquota informada ${div.pis}%/${div.cofins}% difere do regime (${padrao}) em ${div.itens} item(ns)`,
+      detalhes: {
+        produto: div.produto,
+        ncm: div.ncm,
+        baseCalculo: div.base,
+        aliquotaAplicada: div.pis,
+        impacto: 0,
+        acaoSugerida: `Sem alíquota oficial cadastrada para o NCM, a alíquota do C170 foi aceita como devida. Confirmar se há tratamento específico (alíquota diferenciada, monofásico, por unidade) que justifique ${div.pis}%/${div.cofins}%.`,
+      },
+    });
+  });
+
+  divergenciasUnidade.forEach(div => {
+    alertas.push({
+      id: `G2-${alertaId++}`,
+      grupo: 'G2',
+      tipo: 'Alíquota por unidade diverge da Tabela 4.3.11',
+      severidade: 'baixa',
+      mensagem: `NCM ${div.ncm}: C170 informa R$ ${div.arquivo} por unidade e a Tabela 4.3.11 (código ${div.codigo}) traz R$ ${div.tabela}/${div.unidade} em ${div.itens} item(ns)`,
+      detalhes: {
+        produto: div.produto,
+        ncm: div.ncm,
+        impacto: 0,
+        acaoSugerida: 'Conferir a unidade de medida da base (QUANT_BC) e a alíquota por unidade. A diferença pode vir só da unidade (ex.: litro × metro cúbico); por isso não entra no risco quantificado.',
+      },
+    });
+  });
+
+  candidatosAliquotaZero.forEach(c => {
+    alertas.push({
+      id: `G2-${alertaId++}`,
+      grupo: 'G2',
+      tipo: 'NCM consta da Tabela 4.3.13 (alíquota zero)',
+      severidade: 'baixa',
+      mensagem: `NCM ${c.ncm} tributado em ${c.itens} item(ns), mas citado na tabela de alíquota zero`,
+      detalhes: {
+        produto: c.produto,
+        ncm: c.ncm,
+        baseCalculo: c.base,
+        impacto: 0,
+        acaoSugerida: `Verificar se a operação se enquadra na alíquota zero (${c.codigos}). O enquadramento costuma depender de destinação ou condição, por isso não entra no risco quantificado.`,
+      },
+    });
+  });
+
+  // G3: natureza do crédito declarada (M105) × deduzida do CFOP de entrada (R25)
+  analisarCreditosPorNatureza(data).linhas.forEach(linha => {
+    if (linha.divergencia === null || Math.abs(linha.divergencia) <= PARAMETROS_PRODUTO.divergenciaMinimaReconciliacao) return;
+    alertas.push({
+      id: `G3-${alertaId++}`,
+      grupo: 'G3',
+      tipo: 'Natureza do crédito: M105 × CFOP',
+      severidade: 'baixa',
+      mensagem: `Natureza ${linha.natureza} (${linha.descricao}): base declarada no M105 difere da deduzida pelo CFOP das entradas`,
+      detalhes: {
+        valorLancado: linha.baseDeclaradaPIS,
+        valorEsperado: linha.baseDeduzidaC170,
+        diferenca: Math.abs(linha.divergencia),
+        impacto: 0,
+        acaoSugerida: `O M105 é a declaração do contribuinte e prevalece. Conferir se itens do C170 (${linha.itensC170} com CFOP desta natureza) foram classificados em outra natureza, ou se a base vem de registros consolidados (C190/C191) ou de outros blocos.`,
+      },
+    });
+  });
+
   // G3: Reconciliação M×Docs (Receita Apurada vs Receita Documental)
   const receitaDocumental = data.receitaDocumental.total;
-  const receitaApuradaPIS = data.receitaApurada.pisM210;
-  const receitaApuradaCOFINS = data.receitaApurada.cofinsM610;
+  const receitaApuradaPIS = data.receitaApurada.pisM210 + data.receitaApurada.pisM400;
+  const receitaApuradaCOFINS = data.receitaApurada.cofinsM610 + data.receitaApurada.cofinsM800;
   const receitaApuradaMedia = data.receitaApurada.total;
   
   const difReconciliacaoPIS = Math.abs(receitaDocumental - receitaApuradaPIS);
@@ -914,14 +1203,14 @@ export const analisarAlertas = (data: EFDData): AlertaFiscal[] => {
   const difReconciliacaoMedia = Math.abs(receitaDocumental - receitaApuradaMedia);
 
   // Alerta para divergência no PIS
-  if (difReconciliacaoPIS > 100 && receitaApuradaPIS > 0) {
+  if (difReconciliacaoPIS > PARAMETROS_PRODUTO.divergenciaMinimaReconciliacao && receitaApuradaPIS > 0) {
     const percentualDiv = ((difReconciliacaoPIS / receitaApuradaPIS) * 100).toFixed(2);
     alertas.push({
       id: `G3-${alertaId++}`,
       grupo: 'G3',
-      tipo: 'Reconciliação M210×Docs',
+      tipo: 'Reconciliação M210+M400×Docs',
       severidade: difReconciliacaoPIS > 10000 ? 'alta' : difReconciliacaoPIS > 1000 ? 'media' : 'baixa',
-      mensagem: `Divergência entre receita apurada (M210/PIS) e documentos fiscais (${percentualDiv}%)`,
+      mensagem: `Divergência entre receita apurada (M210+M400/PIS) e documentos fiscais (${percentualDiv}%)`,
       detalhes: {
         valorLancado: receitaApuradaPIS,
         valorEsperado: receitaDocumental,
@@ -933,14 +1222,14 @@ export const analisarAlertas = (data: EFDData): AlertaFiscal[] => {
   }
 
   // Alerta para divergência no COFINS
-  if (difReconciliacaoCOFINS > 100 && receitaApuradaCOFINS > 0) {
+  if (difReconciliacaoCOFINS > PARAMETROS_PRODUTO.divergenciaMinimaReconciliacao && receitaApuradaCOFINS > 0) {
     const percentualDiv = ((difReconciliacaoCOFINS / receitaApuradaCOFINS) * 100).toFixed(2);
     alertas.push({
       id: `G3-${alertaId++}`,
       grupo: 'G3',
-      tipo: 'Reconciliação M610×Docs',
+      tipo: 'Reconciliação M610+M800×Docs',
       severidade: difReconciliacaoCOFINS > 10000 ? 'alta' : difReconciliacaoCOFINS > 1000 ? 'media' : 'baixa',
-      mensagem: `Divergência entre receita apurada (M610/COFINS) e documentos fiscais (${percentualDiv}%)`,
+      mensagem: `Divergência entre receita apurada (M610+M800/COFINS) e documentos fiscais (${percentualDiv}%)`,
       detalhes: {
         valorLancado: receitaApuradaCOFINS,
         valorEsperado: receitaDocumental,
@@ -952,7 +1241,7 @@ export const analisarAlertas = (data: EFDData): AlertaFiscal[] => {
   }
 
   // Alerta geral de reconciliação
-  if (difReconciliacaoMedia > 100 && receitaApuradaMedia > 0) {
+  if (difReconciliacaoMedia > PARAMETROS_PRODUTO.divergenciaMinimaReconciliacao && receitaApuradaMedia > 0) {
     const percentualDiv = receitaApuradaMedia > 0 ? ((difReconciliacaoMedia / receitaApuradaMedia) * 100).toFixed(2) : '0.00';
     alertas.push({
       id: `G3-${alertaId++}`,
@@ -965,7 +1254,7 @@ export const analisarAlertas = (data: EFDData): AlertaFiscal[] => {
         valorEsperado: receitaDocumental,
         diferenca: difReconciliacaoMedia,
         impacto: difReconciliacaoMedia,
-        acaoSugerida: `Reconciliação completa: Bloco A (${data.receitaDocumental.blocoA.toFixed(2)}), Bloco C (${data.receitaDocumental.blocoC.toFixed(2)}), Bloco D (${data.receitaDocumental.blocoD.toFixed(2)}), Bloco F (${data.receitaDocumental.blocoF.toFixed(2)}). Total Documentos: ${receitaDocumental.toFixed(2)} vs M210: ${receitaApuradaPIS.toFixed(2)} / M610: ${receitaApuradaCOFINS.toFixed(2)}`,
+        acaoSugerida: `Reconciliação completa: Bloco A (${data.receitaDocumental.blocoA.toFixed(2)}), Bloco C (${data.receitaDocumental.blocoC.toFixed(2)}), Bloco D (${data.receitaDocumental.blocoD.toFixed(2)}), Bloco F (${data.receitaDocumental.blocoF.toFixed(2)}). Total Documentos: ${receitaDocumental.toFixed(2)} vs M210+M400: ${receitaApuradaPIS.toFixed(2)} / M610+M800: ${receitaApuradaCOFINS.toFixed(2)}. Alerta acima de R$ ${PARAMETROS_PRODUTO.divergenciaMinimaReconciliacao} (${ROTULO_PARAMETRO_PRODUTO}).`,
       },
     });
   }
@@ -1096,6 +1385,10 @@ export interface ResumoRiscosDashboard {
   principal: { valor: number; sub: string };
   multa: { valor: number; sub: string };
   total: { valor: number; sub: string };
+  /** Cenário de autuação: multa de ofício de 75% no lugar da multa de mora */
+  cenarioOficio?: { multa: number; total: number };
+  /** Devido − informado do período, compensando itens pagos a maior (pode ser negativo) */
+  liquidoPeriodo?: number;
   notas: string[];
 }
 
@@ -1154,36 +1447,58 @@ export const montarResumoRiscos = (data: EFDData): ResumoRiscosDashboard => {
     };
   }
 
+  const pct = (v: number) => `${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+  const regimePis = data.regime.pisAliquota ? pct(data.regime.pisAliquota) : '—';
+  const regimeCofins = data.regime.cofinsAliquota ? pct(data.regime.cofinsAliquota) : '—';
+  const liquidoPeriodo =
+    Math.round((data.resumo.pisDevido + data.resumo.cofinsDevido - data.resumo.pisInformado - data.resumo.cofinsInformado) * 100) / 100;
+
   return {
     modo: data.leiaute,
-    receitaTitulo: 'Receita Base',
-    receita: data.resumo.totalVendas,
-    receitaSub: 'Base de cálculo para PIS/COFINS',
+    receitaTitulo: 'Receita documental (A+C+D+F)',
+    receita: data.receitaDocumental.total,
+    receitaSub:
+      `Sem IPI e ICMS-ST · após excluir o ICMS próprio destacado: ${formatMoedaEst(data.receitaDocumental.total - (data.receitaDocumental.exclusoes?.icmsProprio ?? 0))}` +
+      ` · Movimento de saída (C170): ${formatMoedaEst(data.resumo.totalVendas)}`,
     grupoA: {
       emoji: '📊',
       titulo: 'PIS',
-      subtitulo: 'PIS (Alíquota 2,10%)',
-      col1: { titulo: 'PIS Devido', sub: '2,10% da receita', valor: data.resumo.pisDevido },
+      subtitulo: `PIS (regime ${data.regime.descricao || '—'}: ${regimePis})`,
+      col1: { titulo: 'PIS Devido', sub: 'Alíquota por item (NCM → C170 → regime)', valor: data.resumo.pisDevido },
       col2: { titulo: 'PIS Informado', sub: 'Declarado no EFD', valor: data.resumo.pisInformado },
       col3: { titulo: 'PIS Diferença', sub: 'Devido - Informado', valor: data.resumo.pisDiferenca },
     },
     grupoB: {
       emoji: '📈',
       titulo: 'COFINS',
-      subtitulo: 'COFINS (Alíquota 9,90%)',
-      col1: { titulo: 'COFINS Devido', sub: '9,90% da receita', valor: data.resumo.cofinsDevido },
+      subtitulo: `COFINS (regime ${data.regime.descricao || '—'}: ${regimeCofins})`,
+      col1: { titulo: 'COFINS Devido', sub: 'Alíquota por item (NCM → C170 → regime)', valor: data.resumo.cofinsDevido },
       col2: { titulo: 'COFINS Informado', sub: 'Declarado no EFD', valor: data.resumo.cofinsInformado },
       col3: { titulo: 'COFINS Diferença', sub: 'Devido - Informado', valor: data.resumo.cofinsDiferenca },
     },
     totaisTitulo: 'Valores a Complementar',
-    principal: { valor: data.riscoFiscal.totalPrincipal, sub: 'PIS Dif. + COFINS Dif.' },
-    multa: { valor: data.riscoFiscal.totalMulta, sub: '20% do principal' },
-    total: { valor: data.riscoFiscal.totalGeral, sub: 'Principal + Multa' },
+    principal: { valor: data.riscoFiscal.totalPrincipal, sub: 'Diferença bruta por item (PIS + COFINS)' },
+    multa: { valor: data.riscoFiscal.totalMulta, sub: 'Multa de mora (0,33%/dia, até 20%)' },
+    total: { valor: data.riscoFiscal.totalGeral, sub: 'Principal + Multa de mora + Juros Selic' },
+    cenarioOficio: {
+      multa: data.riscoFiscal.totalMultaOficio ?? 0,
+      total: data.riscoFiscal.totalGeralOficio ?? 0,
+    },
+    liquidoPeriodo,
     notas: [
-      'PIS Devido calculado com alíquota de 2,10% (tabela NCM)',
-      'COFINS Devido calculado com alíquota de 9,90% (tabela NCM)',
-      'Multa de mora aplicada conforme Lei 9.430/96 (limitada a 20%)',
-      'Valores devem ser complementados junto à Receita Federal',
+      `Devido por item: Tabela 4.3.10 do SPED (v${VERSOES_TABELAS_SPED['4.3.10']}), depois alíquota do C170, depois regime do 0110; CST 03 por unidade de medida`,
+      'Venda de monofásico adquirido de terceiros é apurada à alíquota zero',
+      ...(data.resumo.itensNaoAvaliaveis > 0
+        ? [`${data.resumo.itensNaoAvaliaveis} item(ns) não avaliável(is) — regime misto sem alíquota ou monofásico com alíquota condicionada; devido igual ao informado`]
+        : []),
+      `Diferença bruta soma só os itens pagos a menor; o líquido do período (devido − informado) é ${formatMoedaEst(liquidoPeriodo)}`,
+      'Regularização espontânea: multa de mora do art. 61 da Lei 9.430/96 (0,33% ao dia, limitada a 20%)',
+      'Autuação: multa de ofício de 75% (art. 44, I, Lei 9.430/96); 100% se qualificada',
+      `Juros: Selic mensal (série 4390 do Bacen, até ${selicDisponivelAte}) do mês seguinte ao vencimento + 1% no mês do pagamento`,
+      ...(selicDesatualizada()
+        ? [`Atenção: a tabela de Selic termina em ${selicDisponivelAte}; os meses seguintes usam a última taxa conhecida até a atualização mensal rodar`]
+        : []),
+      'Vencimento no dia 25 do mês seguinte, antecipado para o dia útil anterior',
     ],
   };
 };

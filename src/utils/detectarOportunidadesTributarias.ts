@@ -4,7 +4,8 @@
  */
 
 import { EFDData, apuraDebitoPisCofins } from './efdParser';
-import { buscarAliquotaNCM } from './ncmTable';
+import { buscarAliquotaNCM, classificarNCM, isRevendaMonofasico, tipoVendaCfop } from './ncmTable';
+import { PARAMETROS_PRODUTO, ROTULO_PARAMETRO_PRODUTO } from './parametrosProduto';
 
 export interface OportunidadeTributaria {
   id: string;
@@ -38,8 +39,10 @@ export interface OportunidadeTributaria {
 
 /**
  * 1. Detecta créditos não aproveitados de PIS/COFINS
- * Lógica: Cruzar itens de entrada (CFOP 1xxx, 2xxx, 3xxx) com CST de crédito (50-66)
- * e comparar o crédito esperado (tabela NCM ou alíquotas do regime) com o efetivamente escriturado.
+ * Lógica: Cruzar itens de entrada (CFOP 1xxx, 2xxx, 3xxx) com CST de crédito básico (50-56)
+ * e comparar o crédito esperado (alíquota do C170 ou do regime) com o efetivamente escriturado.
+ * Crédito presumido (CST 60-66) depende do produto fabricado e monofásico tem crédito vedado
+ * na revenda: os dois ficam fora do valor recuperável.
  * Reporta tanto crédito não escriturado (valor zero) quanto escriturado a menor (diferença).
  */
 export const detectarCreditosNaoAproveitados = (data: EFDData): OportunidadeTributaria[] => {
@@ -53,26 +56,22 @@ export const detectarCreditosNaoAproveitados = (data: EFDData): OportunidadeTrib
   });
 
   // Analisa cada entrada
+  // Regime cumulativo não apura crédito
+  if (data.regime.codigo === '2') return oportunidades;
+
   entradas.forEach(entrada => {
-    // Verifica se o CST permite crédito (50-66)
     const cstPIS = parseInt(entrada.pisCst) || 0;
     const cstCOFINS = parseInt(entrada.cofinsCst) || 0;
 
-    const permiteCredito = (
-      (cstPIS >= 50 && cstPIS <= 66) ||
-      (cstCOFINS >= 50 && cstCOFINS <= 66)
+    const creditoBasico = (
+      (cstPIS >= 50 && cstPIS <= 56) ||
+      (cstCOFINS >= 50 && cstCOFINS <= 56)
     );
 
-    if (permiteCredito) {
-      // Alíquota de crédito: tabela NCM (se houver), senão alíquota informada no C170,
-      // senão regime do arquivo; se não houver 0110, assume não-cumulativo padrão (1,65%/7,6%)
-      const aliqNCM = buscarAliquotaNCM(entrada.ncm, entrada.data);
-      const pisAliquotaEsperada = aliqNCM
-        ? aliqNCM.aliquotaPIS
-        : (entrada.pisAliquota || data.regime.pisAliquota || 1.65);
-      const cofinsAliquotaEsperada = aliqNCM
-        ? aliqNCM.aliquotaCOFINS
-        : (entrada.cofinsAliquota || data.regime.cofinsAliquota || 7.6);
+    if (creditoBasico && !classificarNCM(entrada.ncm, entrada.data).monofasico) {
+      // Alíquota do C170, senão a do regime não cumulativo (1,65%/7,6%)
+      const pisAliquotaEsperada = entrada.pisAliquota || 1.65;
+      const cofinsAliquotaEsperada = entrada.cofinsAliquota || 7.6;
 
       const basePIS = entrada.pisBase || entrada.valor || 0;
       const baseCOFINS = entrada.cofinsBase || entrada.valor || 0;
@@ -134,8 +133,8 @@ export const detectarPagamentosAMaior = (data: EFDData): OportunidadeTributaria[
 
     // Busca alíquota correta na tabela NCM
     const aliquotaNCM = buscarAliquotaNCM(venda.ncm, venda.data);
-    
-    if (aliquotaNCM) {
+
+    if (aliquotaNCM && !isRevendaMonofasico(venda.cfop, venda.ncm, venda.data)) {
       // Compara PIS
       if (venda.pisAliquota > aliquotaNCM.aliquotaPIS) {
         const diferencaAliquota = venda.pisAliquota - aliquotaNCM.aliquotaPIS;
@@ -210,7 +209,6 @@ export const detectarInconsistenciasCST = (data: EFDData): OportunidadeTributari
   let idCounter = 1;
 
   const regimeCodigo = parseInt(data.regime.codigo);
-  const isNaoCumulativo = regimeCodigo === 1;
   const isCumulativo = regimeCodigo === 2;
 
   data.vendas.forEach(venda => {
@@ -239,29 +237,6 @@ export const detectarInconsistenciasCST = (data: EFDData): OportunidadeTributari
         detalhamentoTecnico: `CST ${venda.pisCst}/${venda.cofinsCst} indica apropriação de crédito, mas empresa está em regime ${data.regime.descricao}. Risco de autuação por incorreção cadastral.`
       });
     }
-
-    // Regra: Regime não-cumulativo não deveria usar CST 01-02 (tributação cumulativa)
-    if (isNaoCumulativo && ((cstPIS === 1 || cstPIS === 2) || (cstCOFINS === 1 || cstCOFINS === 2))) {
-      oportunidades.push({
-        id: `CST-${idCounter++}`,
-        tipo: 'INCONSISTENCIA_CST',
-        severidade: 'alta',
-        titulo: 'CST incompatível com regime tributário',
-        descricao: `Regime não-cumulativo utilizando CST de tributação cumulativa`,
-        ncm: venda.ncm,
-        cfop: venda.cfop,
-        cst: `PIS: ${venda.pisCst} / COFINS: ${venda.cofinsCst}`,
-        documento: venda.documento,
-        produto: venda.produto,
-        valorBase: venda.valor,
-        valorCalculado: venda.pisValor + venda.cofinsValor,
-        diferenca: 0,
-        status: 'Inconsistência',
-        impactoFinanceiro: 0,
-        acaoSugerida: `Corrigir CST. Regime não-cumulativo deve usar CST 01 apenas para operações tributadas à alíquota básica (1,65%/7,6%). Verificar se não há pagamento a menor.`,
-        detalhamentoTecnico: `Empresa em regime ${data.regime.descricao} utilizando CST típico de regime cumulativo. Pode indicar erro sistêmico ou operação especial não mapeada.`
-      });
-    }
   });
 
   return oportunidades;
@@ -280,45 +255,48 @@ export const detectarInconsistenciasCFOP = (data: EFDData): OportunidadeTributar
     const isEntrada = ['1', '2', '3'].includes(cfopFirstDigit);
     const isSaida = ['5', '6', '7'].includes(cfopFirstDigit);
 
-    // Detecta operações monofásicas tributadas incorretamente
-    const aliquotaNCM = buscarAliquotaNCM(venda.ncm);
-    if (aliquotaNCM && aliquotaNCM.obs.toLowerCase().includes('monofás')) {
-      // Operações monofásicas não deveriam ter tributação em todas as etapas
-      if (venda.pisValor > 0 || venda.cofinsValor > 0) {
-        const cstPIS = parseInt(venda.pisCst);
-        const cstCOFINS = parseInt(venda.cofinsCst);
-        
-        // CST 04 ou 06 indicam monofásico correto
-        const cstCorreto = (cstPIS === 4 || cstPIS === 6) && (cstCOFINS === 4 || cstCOFINS === 6);
-        
-        if (!cstCorreto && isSaida) {
-          oportunidades.push({
-            id: `MONO-${idCounter++}`,
-            tipo: 'MONOFASICO_INCORRETO',
-            severidade: 'alta',
-            titulo: 'Tributação monofásica incorreta',
-            descricao: `NCM ${venda.ncm} é monofásico mas está sendo tributado na revenda`,
-            ncm: venda.ncm,
-            cfop: venda.cfop,
-            cst: `PIS: ${venda.pisCst} / COFINS: ${venda.cofinsCst}`,
-            documento: venda.documento,
-            produto: venda.produto,
-            valorBase: venda.valor,
-            aliquotaDevida: 0,
-            aliquotaAplicada: venda.pisAliquota + venda.cofinsAliquota,
-            valorCalculado: venda.pisValor + venda.cofinsValor,
-            diferenca: venda.pisValor + venda.cofinsValor,
-            status: 'Reaver',
-            impactoFinanceiro: venda.pisValor + venda.cofinsValor,
-            acaoSugerida: `Utilizar CST 04 (Monofásico) ou 06 (Alíquota Zero) para NCM ${venda.ncm}. Produto sujeito à tributação concentrada. Possível recuperação de R$ ${(venda.pisValor + venda.cofinsValor).toFixed(2)}`,
-            detalhamentoTecnico: `${aliquotaNCM.descricao}. ${aliquotaNCM.obs}. Tributação deve ocorrer apenas na etapa do fabricante/importador.`
-          });
-        }
+    // Monofásico só é recuperável na revenda: o industrial/importador deve a alíquota concentrada
+    const classificacao = classificarNCM(venda.ncm, venda.data);
+    const tipoVenda = tipoVendaCfop(venda.cfop);
+    const ehRevenda = tipoVenda === 'revenda-confirmada' || tipoVenda === 'revenda';
+    if (isSaida && classificacao.monofasico && ehRevenda && (venda.pisValor > 0 || venda.cofinsValor > 0)) {
+      const cstPIS = parseInt(venda.pisCst);
+      const cstCOFINS = parseInt(venda.cofinsCst);
+      // CST 04 ou 06 indicam monofásico correto
+      const cstCorreto = (cstPIS === 4 || cstPIS === 6) && (cstCOFINS === 4 || cstCOFINS === 6);
+
+      if (!cstCorreto) {
+        const valorPago = venda.pisValor + venda.cofinsValor;
+        const confirmado = tipoVenda === 'revenda-confirmada';
+        const produto = classificacao.candidatos[0];
+        oportunidades.push({
+          id: `MONO-${idCounter++}`,
+          tipo: 'MONOFASICO_INCORRETO',
+          severidade: confirmado ? 'alta' : 'media',
+          titulo: confirmado ? 'Tributação monofásica incorreta' : 'Monofásico tributado em saída de terceiros (a confirmar)',
+          descricao: `NCM ${venda.ncm} é monofásico mas está sendo tributado na revenda`,
+          ncm: venda.ncm,
+          cfop: venda.cfop,
+          cst: `PIS: ${venda.pisCst} / COFINS: ${venda.cofinsCst}`,
+          documento: venda.documento,
+          produto: venda.produto,
+          valorBase: venda.valor,
+          aliquotaDevida: 0,
+          aliquotaAplicada: venda.pisAliquota + venda.cofinsAliquota,
+          valorCalculado: valorPago,
+          diferenca: confirmado ? valorPago : 0,
+          status: confirmado ? 'Reaver' : 'Auditoria',
+          impactoFinanceiro: confirmado ? valorPago : 0,
+          acaoSugerida: confirmado
+            ? `Utilizar CST 04 (Monofásico) ou 06 (Alíquota Zero) para NCM ${venda.ncm}. Produto sujeito à tributação concentrada. Possível recuperação de R$ ${valorPago.toFixed(2)}`
+            : `CFOP ${venda.cfop} indica venda de mercadoria de terceiros, mas ainda não é tratado como revenda confirmada. Se for revenda, R$ ${valorPago.toFixed(2)} seriam recuperáveis; valor fora do total até validação.`,
+          detalhamentoTecnico: `${produto?.descricao ?? 'Produto monofásico'} (${produto?.obs ?? 'Tabela 4.3.10 do SPED'}). Tributação deve ocorrer apenas na etapa do fabricante/importador.`
+        });
       }
     }
 
     // Detecta CFOP incoerente (ex: 1102 com valor de saída alto)
-    if (isEntrada && venda.pisValor > 100) {
+    if (isEntrada && venda.pisValor > PARAMETROS_PRODUTO.pisMinimoEntradaComDebito) {
       // Se é entrada mas tem muito PIS/COFINS, pode ser inconsistência
       const cstPIS = parseInt(venda.pisCst);
       if (cstPIS >= 1 && cstPIS <= 9) { // CST de débito em operação de entrada
@@ -339,7 +317,7 @@ export const detectarInconsistenciasCFOP = (data: EFDData): OportunidadeTributar
           status: 'Auditoria',
           impactoFinanceiro: 0,
           acaoSugerida: `Revisar natureza da operação. CFOP ${venda.cfop} indica entrada, mas há débito de PIS/COFINS. Verificar se CFOP ou CST estão corretos.`,
-          detalhamentoTecnico: `CFOP iniciado em ${cfopFirstDigit} normalmente indica entrada (crédito), mas CST ${venda.pisCst} gera débito. Possível erro de classificação.`
+          detalhamentoTecnico: `CFOP iniciado em ${cfopFirstDigit} normalmente indica entrada (crédito), mas CST ${venda.pisCst} gera débito. Possível erro de classificação. Alerta acima de R$ ${PARAMETROS_PRODUTO.pisMinimoEntradaComDebito} de PIS (${ROTULO_PARAMETRO_PRODUTO}).`
         });
       }
     }

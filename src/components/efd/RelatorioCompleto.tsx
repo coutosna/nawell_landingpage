@@ -12,7 +12,7 @@ import {
 import { toast } from 'sonner';
 import { A11yListenButton } from '@/components/a11y/A11yListenButton';
 import { usePageSummary } from '@/contexts/AccessibilityContext';
-import { EFDData } from '@/utils/efdParser';
+import { EFDData, receitaPrincipal } from '@/utils/efdParser';
 import { detectarTodasOportunidades } from '@/utils/detectarOportunidadesTributarias';
 import { gerarRelatoriosTextuais } from '@/utils/gerarRelatorioTextual';
 import {
@@ -64,7 +64,7 @@ export const RelatorioCompleto: React.FC<RelatorioCompletoProps> = React.memo(({
   const ganhoPotencial = useMemo(() =>
     oportunidades.reduce((sum, op) => sum + op.impactoFinanceiro, 0), [oportunidades]);
 
-  const totalVendas = efdData.resumo.totalVendas || 0;
+  const totalVendas = receitaPrincipal(efdData) || 0;
   const totalCompras = efdData.resumo.totalCompras || 0;
   const divergenciaTotal = modoIcms ? somaDivergenciasIcms : (efdData.riscoFiscal.totalPrincipal || 0);
   const multaTotal = modoIcms ? Math.round(somaDivergenciasIcms * 0.2 * 100) / 100 : (efdData.riscoFiscal.totalMulta || 0);
@@ -93,7 +93,7 @@ export const RelatorioCompleto: React.FC<RelatorioCompletoProps> = React.memo(({
       );
     } else {
       base.push(
-        `Receita bruta de ${formatMoeda(totalVendas)}. Diferença principal de ${formatMoeda(divergenciaTotal)}, multa de ${formatMoeda(multaTotal)} e juros de ${formatMoeda(jurosTotal)}. Total geral de risco ${formatMoeda(totalGeralRisco)}.`,
+        `${modoIcms ? 'Movimento de saída' : 'Receita documental'} de ${formatMoeda(totalVendas)}. Diferença principal de ${formatMoeda(divergenciaTotal)}, multa de ${formatMoeda(multaTotal)} e juros de ${formatMoeda(jurosTotal)}. Total geral de risco ${formatMoeda(totalGeralRisco)}.`,
       );
     }
     base.push(
@@ -229,7 +229,7 @@ export const RelatorioCompleto: React.FC<RelatorioCompletoProps> = React.memo(({
       md += `---\n\n`;
       md += `## 1. Resumo Executivo\n\n`;
       md += `- Obrigação: ${obrigacaoNome}\n`;
-      md += `- Receita Total (Vendas): ${formatMoeda(totalVendas)}\n`;
+      md += `- ${modoIcms ? 'Movimento de saída' : 'Receita documental (A+C+D+F)'}: ${formatMoeda(totalVendas)}\n`;
       md += `- Total de Aquisições: ${formatMoeda(totalCompras)}\n`;
       md += `- Total a Complementar: ${formatMoeda(divergenciaTotal)}\n`;
       md += `- Ganho Potencial: ${formatMoeda(ganhoPotencial)}\n`;
@@ -399,9 +399,9 @@ export const RelatorioCompleto: React.FC<RelatorioCompletoProps> = React.memo(({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         <Card className="p-4 border border-border/70 shadow-sm">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Receita Total</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">{modoIcms ? 'Movimento de saída' : 'Receita documental'}</p>
           <p className="text-xl font-bold text-efd-secondary mt-1.5">{formatMoeda(totalVendas)}</p>
-          <p className="text-xs text-muted-foreground mt-1">Vendas no período</p>
+          <p className="text-xs text-muted-foreground mt-1">{modoIcms ? 'Vendas no período' : 'A+C+D+F, sem IPI e ICMS-ST'}</p>
         </Card>
         <Card className="p-4 border border-border/70 shadow-sm">
           <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Aquisições</p>
@@ -534,7 +534,7 @@ export const RelatorioCompleto: React.FC<RelatorioCompletoProps> = React.memo(({
               <strong className={conferenciasDivergentes.length > 0 ? 'text-destructive' : 'text-success'}>{conferenciasDivergentes.length} divergente(s)</strong>,
               com ICMS a recolher de <strong className="text-foreground">{formatMoeda(efdData.icmsIpi?.resumo.icmsRecolher ?? 0)}</strong> e
               IPI saldo de <strong className="text-foreground">{formatMoeda(efdData.icmsIpi?.resumo.ipiSaldo ?? 0)}</strong>,
-              sobre as vendas totais de <strong className="text-success">{formatMoeda(totalVendas)}</strong>.
+              sobre a receita de <strong className="text-success">{formatMoeda(totalVendas)}</strong>.
             </p>
           ) : (
             <p>
